@@ -1,4 +1,3 @@
-version: '3.8'
 
 # PRODUCTION docker-compose
 # Pro development použij: docker-compose -f docker-compose.dev.yml up
