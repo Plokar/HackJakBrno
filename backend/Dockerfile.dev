@@ -19,11 +19,28 @@ RUN pip install --upgrade pip && \
     pip install -r requirements.txt && \
     pip install -r requirements-dev.txt
 
-COPY . /code/
+# Vytvořit entrypoint script v /usr/local/bin (mimo volume mount)
+RUN printf '#!/bin/sh\n\
+set -e\n\
+echo "Starting Django application..."\n\
+echo "Waiting for PostgreSQL..."\n\
+while ! nc -z $POSTGRES_HOST $POSTGRES_PORT; do\n\
+  sleep 0.1\n\
+done\n\
+echo "PostgreSQL started"\n\
+cd /code\n\
+echo "Running database migrations..."\n\
+python manage.py migrate --noinput\n\
+if [ "$DJANGO_DEBUG" = "True" ]; then\n\
+  echo "Starting development server..."\n\
+  python manage.py runserver 0.0.0.0:8000\n\
+else\n\
+  echo "Starting production server with Gunicorn..."\n\
+  gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4\n\
+fi\n' > /usr/local/bin/docker-entrypoint.sh && chmod +x /usr/local/bin/docker-entrypoint.sh
 
-RUN chmod +x /code/entrypoint.sh
+COPY . /code/
 
 EXPOSE 8000
 
-# V dev módu používáme runserver s hot reload
-CMD ["bash", "-c", "./entrypoint.sh"]
+CMD ["/usr/local/bin/docker-entrypoint.sh"]

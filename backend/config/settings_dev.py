@@ -20,10 +20,9 @@ INTERNAL_IPS = [
     'localhost',
 ]
 
-# CORS pro development (pokud chcete volat API z externího frontendu)
-# INSTALLED_APPS += ['corsheaders']
-# MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
-# CORS_ALLOW_ALL_ORIGINS = True
+# CORS pro development - povolujeme všechny origins pro lokální vývoj
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
 
 # Logging
 LOGGING = {

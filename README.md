@@ -1,4 +1,8 @@
 Medic Hub system
+Vytvořte dashboard pro sledování vytížení a nákladů operačních sálů pro Fakultní nemocnice u svaté Anny v Brně. Návrh a vizualizace mají pokrýt: automatické zpracování dat z nemocničního informačního systému, zobrazení vytížení sálů, dobu prostojů, počet výkonů v reálném čase, a paralelně náklady na operaci (včetně odpisů přístrojů, spotřeby materiálu, nákladů na práci personálu). Cílem je zefektivnit plánování operací, optimalizovat využití přístrojů a nákladů a zlepšit rozhodování vedení nemocnice na základě objektivních dat.
+
+
+
 - zobrazení vytíženost sálu 
 - 20 operačních sálu 
     - > vybírý si z nich admin  

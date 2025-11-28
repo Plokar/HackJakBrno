@@ -17,7 +17,7 @@ services:
     build: 
       context: ./backend
       dockerfile: Dockerfile.dev
-    command: bash -c "./entrypoint.sh"
+    command: /usr/local/bin/docker-entrypoint.sh
     volumes:
       - ./backend:/code  # live reload
     env_file:
