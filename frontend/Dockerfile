@@ -1,12 +1,11 @@
-# Production Dockerfile - multi-stage build pro optimalizaci velikosti
+# Production Dockerfile - jednodušší verze bez standalone
 FROM node:20-alpine AS deps
-# Kontrola https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Install dependencies
-COPY package.json package-lock.json* ./
-RUN npm ci --only=production --silent
+COPY package.json ./
+RUN npm install
 
 # Builder stage
 FROM node:20-alpine AS builder
@@ -16,32 +15,27 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Build Next.js pro produkci
-ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-
 RUN npm run build
 
-# Runner stage - finální minimalizovaný image
+# Runner stage - production
 FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Přidat non-root uživatele pro bezpečnost
+# Přidat non-root uživatele
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy pouze potřebné soubory z builderu
+# Copy build output
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
 
-# Set correct permissions pro prerendered cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Automaticky využije standalone output
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+RUN chown -R nextjs:nodejs /app
 
 USER nextjs
 
@@ -50,8 +44,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
-
-CMD ["node", "server.js"]
+# Start Next.js
+CMD ["npm", "start"]
