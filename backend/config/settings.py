@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     # Local apps (modulární monolit - každý modul je samostatná doménová oblast)
     'apps.authentication',  # Autentizace a autorizace
     'apps.items',  # Example module
+    'apps.operating_rooms',  # Medic Hub - operační sály
 ]
 
 MIDDLEWARE = [

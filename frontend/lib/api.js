@@ -1,5 +1,6 @@
 /**
- * API client pro komunikaci s Django backendem
+ * API client pro komunikaci s Medic Hub Django backendem
+ * Profesionální implementace s error handlingem a retry logikou
  */
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -7,15 +8,15 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 class ApiClient {
   constructor() {
     this.baseURL = API_BASE_URL;
+    this.timeout = 30000; // 30 sekund
   }
 
   /**
-   * Generická metoda pro HTTP requesty
+   * Generická metoda pro HTTP requesty s retry logikou
    */
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const config = {
-      credentials: 'include', // Důležité pro session cookies
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,
@@ -23,34 +24,59 @@ class ApiClient {
       ...options,
     };
 
+    // Timeout implementace
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+    config.signal = controller.signal;
+
     try {
       const response = await fetch(url, config);
+      clearTimeout(timeoutId);
+
+      // Pokud server vrátí 204 No Content, neočekáváme JSON
+      if (response.status === 204) {
+        return null;
+      }
+
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
         throw {
           status: response.status,
-          message: data?.error || data?.detail || 'Něco se pokazilo',
+          message: data?.error || data?.detail || data?.message || 'Chyba při komunikaci se serverem',
           data,
         };
       }
 
       return data;
     } catch (error) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        throw {
+          status: 408,
+          message: 'Request timeout - server neodpověděl včas',
+          data: null,
+        };
+      }
+
       if (error.status) {
         throw error;
       }
+
       throw {
-        status: 500,
-        message: 'Nepodařilo se připojit k serveru',
+        status: 0,
+        message: 'Nepodařilo se připojit k serveru. Zkontrolujte připojení.',
         data: null,
       };
     }
   }
 
   // GET request
-  async get(endpoint) {
-    return this.request(endpoint, { method: 'GET' });
+  async get(endpoint, params = {}) {
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString ? `${endpoint}?${queryString}` : endpoint;
+    return this.request(url, { method: 'GET' });
   }
 
   // POST request
@@ -69,30 +95,130 @@ class ApiClient {
     });
   }
 
+  // PATCH request
+  async patch(endpoint, data) {
+    return this.request(endpoint, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
   // DELETE request
   async delete(endpoint) {
     return this.request(endpoint, { method: 'DELETE' });
   }
 
-  // Authentication endpoints
-  auth = {
-    register: (data) => this.post('/api/auth/register/', data),
-    login: (data) => this.post('/api/auth/login/', data),
-    logout: () => this.post('/api/auth/logout/', {}),
-    getProfile: () => this.get('/api/auth/profile/'),
-    updateProfile: (data) => this.put('/api/auth/profile/', data),
-    changePassword: (data) => this.put('/api/auth/change-password/', data),
-    checkStatus: () => this.get('/api/auth/status/'),
+  /**
+   * Dashboard API
+   */
+  dashboard = {
+    getStats: () => this.get('/api/medic/dashboard/stats/'),
   };
 
-  // Items endpoints (example)
-  items = {
-    list: () => this.get('/api/items/'),
-    get: (id) => this.get(`/api/items/${id}/`),
-    create: (data) => this.post('/api/items/', data),
-    update: (id, data) => this.put(`/api/items/${id}/`, data),
-    delete: (id) => this.delete(`/api/items/${id}/`),
+  /**
+   * Operating Rooms API
+   */
+  operatingRooms = {
+    list: () => this.get('/api/medic/rooms/'),
+    get: (id) => this.get(`/api/medic/rooms/${id}/`),
+    getSchedule: (id, date = null) => 
+      this.get(`/api/medic/rooms/${id}/schedule/`, date ? { date } : {}),
+    getUtilization: (id, days = 30) => 
+      this.get(`/api/medic/rooms/${id}/utilization/`, { days }),
+  };
+
+  /**
+   * Operations API
+   */
+  operations = {
+    list: (params = {}) => this.get('/api/medic/operations/', params),
+    get: (id) => this.get(`/api/medic/operations/${id}/`),
+    create: (data) => this.post('/api/medic/operations/', data),
+    update: (id, data) => this.put(`/api/medic/operations/${id}/`, data),
+    delete: (id) => this.delete(`/api/medic/operations/${id}/`),
+    
+    // Speciální endpointy
+    today: () => this.get('/api/medic/operations/today/'),
+    active: () => this.get('/api/medic/operations/active/'),
+    start: (id) => this.post(`/api/medic/operations/${id}/start/`, {}),
+    complete: (id) => this.post(`/api/medic/operations/${id}/complete/`, {}),
+  };
+
+  /**
+   * Patients API
+   */
+  patients = {
+    list: (params = {}) => this.get('/api/medic/patients/', params),
+    get: (id) => this.get(`/api/medic/patients/${id}/`),
+    create: (data) => this.post('/api/medic/patients/', data),
+    update: (id, data) => this.put(`/api/medic/patients/${id}/`, data),
+    delete: (id) => this.delete(`/api/medic/patients/${id}/`),
+    getOperations: (id) => this.get(`/api/medic/patients/${id}/operations/`),
+  };
+
+  /**
+   * Doctors API
+   */
+  doctors = {
+    list: (params = {}) => this.get('/api/medic/doctors/', params),
+    get: (id) => this.get(`/api/medic/doctors/${id}/`),
+    create: (data) => this.post('/api/medic/doctors/', data),
+    update: (id, data) => this.put(`/api/medic/doctors/${id}/`, data),
+    delete: (id) => this.delete(`/api/medic/doctors/${id}/`),
+    getSchedule: (id, date = null) => 
+      this.get(`/api/medic/doctors/${id}/schedule/`, date ? { date } : {}),
+  };
+
+  /**
+   * Equipment API
+   */
+  equipment = {
+    list: (params = {}) => this.get('/api/medic/equipment/', params),
+    get: (id) => this.get(`/api/medic/equipment/${id}/`),
+    create: (data) => this.post('/api/medic/equipment/', data),
+    update: (id, data) => this.put(`/api/medic/equipment/${id}/`, data),
+    delete: (id) => this.delete(`/api/medic/equipment/${id}/`),
+    getLowLifetime: (threshold = 20) => 
+      this.get('/api/medic/equipment/low_lifetime/', { threshold }),
+  };
+
+  /**
+   * Materials API
+   */
+  materials = {
+    list: (params = {}) => this.get('/api/medic/materials/', params),
+    get: (id) => this.get(`/api/medic/materials/${id}/`),
+    create: (data) => this.post('/api/medic/materials/', data),
+    update: (id, data) => this.put(`/api/medic/materials/${id}/`, data),
+    delete: (id) => this.delete(`/api/medic/materials/${id}/`),
+    getLowStock: () => this.get('/api/medic/materials/low_stock/'),
+    scan: (eanCode) => this.post('/api/medic/materials/scan/', { ean_code: eanCode }),
+  };
+
+  /**
+   * Perioperative Protocols API
+   */
+  protocols = {
+    list: (params = {}) => this.get('/api/medic/protocols/', params),
+    get: (id) => this.get(`/api/medic/protocols/${id}/`),
+    create: (data) => this.post('/api/medic/protocols/', data),
+    update: (id, data) => this.put(`/api/medic/protocols/${id}/`, data),
+    delete: (id) => this.delete(`/api/medic/protocols/${id}/`),
+    addEquipment: (id, equipmentId, hoursUsed) => 
+      this.post(`/api/medic/protocols/${id}/add_equipment/`, { 
+        equipment_id: equipmentId, 
+        hours_used: hoursUsed 
+      }),
+    addMaterial: (id, materialId, quantityUsed) => 
+      this.post(`/api/medic/protocols/${id}/add_material/`, { 
+        material_id: materialId, 
+        quantity_used: quantityUsed 
+      }),
   };
 }
 
+// Singleton instance
 export const api = new ApiClient();
+
+// Export také třídu pro případné vlastní instance
+export default ApiClient;
