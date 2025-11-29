@@ -5,3 +5,31 @@
 html, body, #__next {
   height: 100%;
 }
+
+/* Animace pro zvýrazněnou operaci */
+@keyframes highlight-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(194, 21, 51, 0.7);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(194, 21, 51, 0);
+    transform: scale(1.02);
+  }
+}
+
+.highlighted-operation {
+  animation: highlight-pulse 2s ease-in-out 3;
+  border-width: 3px !important;
+  font-weight: 600 !important;
+}
+
+/* Operace v minulosti (neukončené) */
+.past-operation {
+  opacity: 0.7;
+  filter: grayscale(20%);
+}
+
+.past-operation:hover {
+  opacity: 0.9;
+}

@@ -30,21 +30,24 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
   const fetchRoomDetail = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/medic/rooms/${roomId}/detail/`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-        }
-      );
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const url = apiUrl.startsWith('/api/proxy') 
+        ? `/api/proxy/medic/rooms/${roomId}/detail/`
+        : `${apiUrl}/medic/rooms/${roomId}/detail/`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
 
       if (!response.ok) {
         throw new Error('Nepodařilo se načíst detail sálu');
       }
 
       const data = await response.json();
+      console.log('Room detail loaded:', data);
       setRoomDetail(data);
       setError(null);
     } catch (err) {
@@ -122,7 +125,24 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
 
   const goToCalendar = () => {
     onClose();
-    router.push('/calendar');
+    
+    // Pokud existuje aktuální operace, naviguj s parametrem operace a sálu
+    if (roomDetail?.currentOperation?.id) {
+      router.push({
+        pathname: '/calendar',
+        query: { 
+          operationId: roomDetail.currentOperation.id,
+          roomId: roomId,
+          highlight: 'true'
+        }
+      });
+    } else {
+      // Jinak jen naviguj na kalendář s filtrem sálu
+      router.push({
+        pathname: '/calendar',
+        query: { roomId: roomId }
+      });
+    }
   };
 
   const statusConfig = roomDetail ? getStatusConfig(roomDetail.status) : {};
