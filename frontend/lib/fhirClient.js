@@ -1,9 +1,7 @@
 /**
  * FHIR Client - Knihovna pro komunikaci s FHIR serverem
  */
-import Client from 'fhir-kit-client';
 
-const FHIR_SERVER_URL = process.env.NEXT_PUBLIC_FHIR_URL || 'http://localhost:32783/fhir/r4';
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 const USE_PROXY = API_BASE_URL.startsWith('/api/proxy');
 
@@ -15,11 +13,6 @@ function makeApiUrl(path) {
   }
   return `${API_BASE_URL}${path}`;
 }
-
-// FHIR Kit Client pro přímou komunikaci s FHIR serverem
-const fhirClient = new Client({
-  baseUrl: FHIR_SERVER_URL
-});
 
 /**
  * Fetch pacienty z backendu (Django cache)
@@ -278,6 +271,4 @@ export async function checkFHIRServerStatus() {
   }
 }
 
-// Export FHIR client pro přímé použití (pokud je potřeba)
-export { fhirClient };
 

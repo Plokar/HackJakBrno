@@ -143,7 +143,7 @@ export default function RoomStatusGrid({ rooms = [], onRoomClick }) {
               key={room.id}
               onClick={() => onRoomClick && onRoomClick(room)}
               className={classNames(
-                'relative rounded-lg p-4 cursor-pointer transition-all duration-200',
+                'relative rounded-lg p-4 cursor-pointer transition-all duration-200 flex flex-col',
                 'hover:shadow-xl hover:scale-105',
                 config.bgColor
               )}
@@ -175,7 +175,7 @@ export default function RoomStatusGrid({ rooms = [], onRoomClick }) {
 
               {/* Status Badge */}
               <div className={classNames(
-                'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mb-3 border-2',
+                'inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium mb-3 border-2 w-fit',
                 'text-white',
                 config.badgeBgColor,
                 config.badgeBorderColor
@@ -232,19 +232,23 @@ export default function RoomStatusGrid({ rooms = [], onRoomClick }) {
                 </div>
               )}
 
-              {/* Utilization Bar */}
-              <div className="mt-3">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs text-gray-600">Využití dnes:</span>
-                  <span className="text-xs font-semibold text-gray-900">
-                    {room.utilization || 0}%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${room.utilization || 0}%`, backgroundColor: '#6D1F27' }}
-                  ></div>
+              {/* Statistics - Always at the bottom */}
+              <div className="mt-auto pt-3 border-t border-gray-200 space-y-2">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Operací dnes:</span>
+                    <span className="font-semibold text-gray-900">{room.scheduledToday || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Nadcházející:</span>
+                    <span className="font-semibold text-gray-900">{room.upcomingCount || 0}</span>
+                  </div>
+                  {room.urgentToday > 0 && (
+                    <div className="flex items-center justify-between col-span-2">
+                      <span className="text-red-600">⚠️ Urgentní dnes:</span>
+                      <span className="font-semibold text-red-700">{room.urgentToday}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

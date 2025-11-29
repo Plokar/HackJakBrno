@@ -50,13 +50,13 @@ export default function AlertsPanel({ rooms = [] }) {
         }
       }
 
-      // Check for low utilization
-      if (room.utilization < 50) {
+      // Check for no operations scheduled today
+      if (room.status === 'available' && (!room.scheduledToday || room.scheduledToday === 0)) {
         alerts.push({
-          id: `low-util-${room.id}`,
-          type: 'warning',
-          title: 'Nízké využití',
-          message: `${room.name} - využití pouze ${room.utilization}%`,
+          id: `no-ops-${room.id}`,
+          type: 'info',
+          title: 'Žádné operace dnes',
+          message: `${room.name} - dnes nejsou naplánované žádné operace`,
           room: room.name,
           timestamp: new Date()
         });

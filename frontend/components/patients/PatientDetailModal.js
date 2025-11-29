@@ -38,9 +38,9 @@ export default function PatientDetailModal({ patient, onClose }) {
   const age = calculateAge(patient.birthDate || patient.date_of_birth);
 
   return (
-    <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+    <div className="w-full max-h-[90vh] overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 text-white">
+      <div className="bg-gradient-to-r from-[#6D1F27] to-[#E00034] p-6 text-white">
         <div className="flex justify-between items-start">
           <div className="flex items-center space-x-4">
             <div className="bg-white bg-opacity-20 rounded-full p-3">
@@ -48,7 +48,7 @@ export default function PatientDetailModal({ patient, onClose }) {
             </div>
             <div>
               <h2 className="text-2xl font-bold">{patient.name || `${patient.first_name} ${patient.last_name}`}</h2>
-              <p className="text-blue-100">ID: {patient.id} {patient.fhir_id && `| FHIR ID: ${patient.fhir_id}`}</p>
+              <p className="text-white opacity-90">ID: {patient.id} {patient.fhir_id && `| FHIR ID: ${patient.fhir_id}`}</p>
               <div className="flex items-center mt-2 space-x-4">
                 {age && (
                   <span className="text-sm bg-white bg-opacity-20 px-3 py-1 rounded-full">
@@ -84,7 +84,7 @@ export default function PatientDetailModal({ patient, onClose }) {
                 className={classNames(
                   'flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                   activeTab === tab.id
-                    ? 'bg-blue-100 text-blue-700'
+                    ? 'bg-red-100 text-red-700'
                     : 'text-gray-600 hover:bg-gray-100'
                 )}
               >
@@ -142,12 +142,15 @@ function OverviewTab({ patient, age }) {
             value={
               <span className={classNames(
                 'px-3 py-1 rounded-full text-sm font-medium',
-                patient.status === 'scheduled' ? 'bg-blue-100 text-blue-800' :
+                patient.status === 'scheduled' ? 'bg-purple-100 text-purple-800' :
                 patient.status === 'in_operation' ? 'bg-green-100 text-green-800' :
                 patient.status === 'post_op' ? 'bg-yellow-100 text-yellow-800' :
                 'bg-gray-100 text-gray-800'
               )}>
-                {patient.status || 'Neznámý'}
+                {patient.status === 'scheduled' ? 'Naplánováno' :
+                 patient.status === 'in_operation' ? 'V operaci' :
+                 patient.status === 'post_op' ? 'Po operaci' :
+                 patient.status || 'Neznámý'}
               </span>
             } 
           />
@@ -237,10 +240,13 @@ function OperationsTab({ operations = [] }) {
                 ? 'bg-green-100 text-green-800'
                 : operation.status === 'in_progress'
                 ? 'bg-blue-100 text-blue-800'
+                : operation.status === 'scheduled'
+                ? 'bg-purple-100 text-purple-800'
                 : 'bg-gray-100 text-gray-800'
             )}>
               {operation.status === 'completed' ? 'Dokončeno' : 
                operation.status === 'in_progress' ? 'Probíhá' : 
+               operation.status === 'scheduled' ? 'Naplánováno' :
                operation.status || 'Neznámý'}
             </span>
           </div>
