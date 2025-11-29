@@ -7,7 +7,8 @@ import {
   CalendarIcon,
   BeakerIcon,
   DocumentTextIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/router';
 
@@ -414,13 +415,5 @@ function StatCard({ label, value, color = 'blue' }) {
       <p className="text-xs font-medium opacity-80">{label}</p>
       <p className="mt-2 text-2xl font-bold">{value}</p>
     </div>
-  );
-}
-
-function CheckCircleIcon({ className }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
   );
 }

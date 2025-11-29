@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -14,6 +14,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
   const calendarRef = useRef(null);
   const calendarContainerRef = useRef(null);
   const columnStyleRef = useRef(null);
+  const prevColumnCountRef = useRef(0); // Sledovat předchozí hodnotu columnCount
   const [view, setView] = useState('timeGridWeek');
   const [selectedRoom, setSelectedRoom] = useState(null);
   const isDoctor = currentRole === 'doctor';
@@ -26,7 +27,13 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     columnIndex: null
   });
 
-  console.log('OperationCalendar render:', { operationsCount: operations.length, roomsCount: rooms.length });
+  console.log('OperationCalendar render:', { 
+    operationsCount: operations.length, 
+    roomsCount: rooms.length,
+    view,
+    columnCount,
+    selectedRoom 
+  });
 
   const handleViewChange = (newView) => {
     setView(newView);
@@ -41,12 +48,38 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     ? operations.filter(op => op.room?.id === selectedRoom)
     : operations;
 
-  const getColumnWidth = (index) => {
+  const getColumnWidth = useCallback((index) => {
     // v měsíčním zobrazení použijeme větší výchozí šířku
-    const defaultWidth = view === 'dayGridMonth' ? DEFAULT_MONTH_COLUMN_WIDTH : DEFAULT_COLUMN_WIDTH;
+    const defaultWidth = view === 'dayGridMonth' ? 165 : 150; // Použít hodnoty přímo
     return columnWidths[index] || defaultWidth;
-  };
+  }, [view, columnWidths]);
   // resetColumnWidths removed — uživatel nemá možnost resetovat šířky jednotlivých sloupců
+
+  // Synchronizovat ref s state při změně columnCount
+  useEffect(() => {
+    prevColumnCountRef.current = columnCount;
+  }, [columnCount]);
+
+  // Při změně view nebo selectedRoom, dát FullCalendar čas na re-render
+  // a pak znovu aplikovat resize handles
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const container = calendarContainerRef.current;
+      if (container) {
+        const headerCells = container.querySelectorAll('.fc-col-header-cell');
+        if (headerCells.length > 0) {
+          console.log(`[Calendar] Triggering re-apply of header logic after view/room change. Cells: ${headerCells.length}`);
+          // Force re-render kalendáře
+          if (calendarRef.current) {
+            const calendarApi = calendarRef.current.getApi();
+            calendarApi.render();
+          }
+        }
+      }
+    }, 150); // Dát FullCalendar čas na re-render
+
+    return () => clearTimeout(timer);
+  }, [view, selectedRoom]);
 
   useEffect(() => {
     const handlePointerMove = (event) => {
@@ -97,7 +130,15 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
       const headerCells = container.querySelectorAll('.fc-col-header-cell');
       if (!headerCells.length) return; // čekáme až se DOM vykreslí
 
-      setColumnCount(headerCells.length);
+      // DŮLEŽITÉ: Používat ref pro porovnání, aby se zabránilo zbytečným state updates
+      // Voláme setColumnCount pouze pokud se hodnota SKUTEČNĚ změnila
+      const newColumnCount = headerCells.length;
+      if (newColumnCount !== prevColumnCountRef.current) {
+        console.log(`[Calendar] Column count changed: ${prevColumnCountRef.current} -> ${newColumnCount}`);
+        prevColumnCountRef.current = newColumnCount;
+        setColumnCount(newColumnCount);
+      }
+      
       // nejprve smaž staré úchyty
       headerCells.forEach((cell) => {
         cell.classList.remove('calendar-header-resizable');
@@ -141,17 +182,50 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     // pokusíme se aplikovat hned (první render)
     applyHeaderLogic();
 
+    // Debounce pro MutationObserver - zabraňuje přílišnému spouštění
+    let timeoutId = null;
+    const debouncedApplyHeaderLogic = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        applyHeaderLogic();
+      }, 100); // Počkat 100ms po poslední změně
+    };
+
     // sledování změn v DOM (když FullCalendar přepne view)
-    const observer = new MutationObserver(() => {
-      applyHeaderLogic();
+    // POZOR: Sledujeme pouze childList na první úrovni, ne subtree!
+    const observer = new MutationObserver((mutations) => {
+      // Ignorovat mutace, které jsou způsobené našimi resize handles
+      const relevantMutations = mutations.filter(mutation => {
+        if (mutation.type === 'childList') {
+          // Kontrola, zda přidané/odebrané nody nejsou naše handles
+          const addedHandles = Array.from(mutation.addedNodes).some(node => 
+            node.nodeType === 1 && node.classList?.contains('calendar-resize-handle')
+          );
+          const removedHandles = Array.from(mutation.removedNodes).some(node =>
+            node.nodeType === 1 && node.classList?.contains('calendar-resize-handle')
+          );
+          return !addedHandles && !removedHandles;
+        }
+        return false;
+      });
+      
+      if (relevantMutations.length > 0) {
+        debouncedApplyHeaderLogic();
+      }
     });
-    observer.observe(container, { childList: true, subtree: true });
+    
+    // Sledovat pouze childList změny, ne všechny subtree změny
+    observer.observe(container, { 
+      childList: true, 
+      subtree: false // DŮLEŽITÉ: Nesledovat všechny vnořené změny!
+    });
 
     return () => {
+      if (timeoutId) clearTimeout(timeoutId);
       observer.disconnect();
       cleanupHandles();
     };
-  }, [view, columnWidths]);
+  }, [view, getColumnWidth, selectedRoom]); // Přidat selectedRoom - při změně místnosti znovu aplikovat logic!
 
   useEffect(() => {
     if (!columnStyleRef.current) {
@@ -182,7 +256,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     }
 
     columnStyleRef.current.textContent = css;
-  }, [columnWidths, columnCount]);
+  }, [columnCount, getColumnWidth]); // Použít getColumnWidth místo columnWidths
 
   useEffect(() => {
     return () => {
@@ -296,7 +370,11 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
             <select
               id="room-select"
               value={selectedRoom || ''}
-              onChange={(e) => setSelectedRoom(e.target.value ? parseInt(e.target.value) : null)}
+              onChange={(e) => {
+                const newRoom = e.target.value ? parseInt(e.target.value) : null;
+                console.log(`[Calendar] Room selection changed: ${selectedRoom} -> ${newRoom}`);
+                setSelectedRoom(newRoom);
+              }}
               className="w-48 px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#C21533] focus:border-transparent"
             >
               <option value="">Všechny sály</option>
