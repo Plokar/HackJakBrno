@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { 
@@ -18,6 +18,23 @@ export default function Layout({ children, currentUser }) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    setHasMounted(true);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('cs-CZ', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [activeUser, setActiveUser] = useState({
     name: 'Admin',
@@ -170,6 +187,9 @@ export default function Layout({ children, currentUser }) {
 
             {/* Right Actions */}
             <div className="flex items-center space-x-3">
+              <div className="hidden sm:flex items-center text-black font-mono text-3xl font-bold min-w-[9ch] justify-end">
+                {hasMounted ? formatTime(currentTime) : '--:--:--'}
+              </div>
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
                 className="relative text-gray-600 hover:text-gray-900 hover:bg-gray-100 p-2 rounded-lg transition-colors"
