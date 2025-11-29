@@ -69,11 +69,11 @@ export default function Layout({ children, currentUser }) {
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       )}>
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-6 bg-gradient-to-r from-blue-600 to-blue-800">
+        <div className="flex items-center justify-between h-16 px-6 bg-gradient-to-r from-[#C21533] to-[#8f0f26]">
           <div className="flex items-center">
             <div className="text-white">
               <h1 className="text-xl font-bold">Medic Hub</h1>
-              <p className="text-xs text-blue-100">FN u sv. Anny</p>
+              <p className="text-xs text-red-100">FN u sv. Anny</p>
             </div>
           </div>
           <button
