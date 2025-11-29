@@ -183,7 +183,7 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
             >
               <Dialog.Panel className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-4">
+                <div className="px-6 py-4" style={{ background: 'linear-gradient(to right, #6D1F27, #E00034)' }}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <Dialog.Title className="text-2xl font-bold text-white">
@@ -320,8 +320,8 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
 
                       {/* Next Operations */}
                       {roomDetail.upcoming_operations && roomDetail.upcoming_operations.length > 0 && (
-                        <div className="border-2 border-blue-200 rounded-lg p-5 bg-blue-50">
-                          <h3 className="text-lg font-bold text-blue-800 mb-4 flex items-center">
+                        <div className="border-2 rounded-lg p-5" style={{ borderColor: '#E00034', backgroundColor: '#fce7ed' }}>
+                          <h3 className="text-lg font-bold mb-4 flex items-center" style={{ color: '#E00034' }}>
                             <CalendarIcon className="h-5 w-5 mr-2" />
                             Nadcházející operace
                           </h3>
@@ -330,7 +330,8 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
                             {roomDetail.upcoming_operations.map((op, idx) => (
                               <div 
                                 key={idx}
-                                className="bg-white rounded-lg p-4 border border-blue-200 hover:shadow-md transition-shadow"
+                                className="bg-white rounded-lg p-4 border hover:shadow-md transition-shadow"
+                                style={{ borderColor: '#E00034' }}
                               >
                                 <div className="flex justify-between items-start">
                                   <div className="flex-1">
@@ -343,7 +344,7 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
                                     </p>
                                   </div>
                                   <div className="text-right">
-                                    <p className="text-sm font-medium text-blue-600">
+                                    <p className="text-sm font-medium" style={{ color: '#E00034' }}>
                                       {formatTime(op.scheduledTime)}
                                     </p>
                                     <p className="text-xs text-gray-500 mt-1">
@@ -389,7 +390,8 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
                   <button
                     type="button"
                     onClick={goToCalendar}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                    style={{ backgroundColor: '#E00034' }}
                   >
                     <CalendarIcon className="h-5 w-5 mr-2" />
                     Zobrazit v kalendáři
