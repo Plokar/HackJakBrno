@@ -11,6 +11,8 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
   const [view, setView] = useState('timeGridWeek');
   const [selectedRoom, setSelectedRoom] = useState(null);
 
+  console.log('OperationCalendar render:', { operationsCount: operations.length, roomsCount: rooms.length });
+
   const handleViewChange = (newView) => {
     setView(newView);
     if (calendarRef.current) {
