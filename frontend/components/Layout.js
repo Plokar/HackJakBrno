@@ -79,7 +79,7 @@ export default function Layout({ children, currentUser }) {
                   className={classNames(
                     'flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-colors',
                     item.current
-                      ? 'bg-blue-50 text-blue-700'
+                      ? 'bg-red-50 text-[#C21533]'
                       : 'text-gray-700 hover:bg-gray-100'
                   )}
                 >
