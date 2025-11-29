@@ -59,18 +59,18 @@ export default function RealTimeDashboard({ data, onRoomClick }) {
   return (
     <div className="space-y-6">
       {/* Header with Real-time Clock */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg shadow-lg p-6 text-white">
+      <div className="bg-gradient-to-r from-[#E00034] to-[#b3002a] rounded-lg shadow-lg p-6 text-white">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold">Operační sály - Real-time Dashboard</h1>
-            <p className="text-blue-100 mt-1">{formatDate(currentTime)}</p>
+            <p className="text-red-100 mt-1">{formatDate(currentTime)}</p>
           </div>
           <div className="text-right">
             <div className="flex items-center justify-end space-x-2">
               <ClockIcon className="h-8 w-8" />
               <span className="text-4xl font-mono font-bold">{formatTime(currentTime)}</span>
             </div>
-            <p className="text-blue-100 text-sm mt-1">Aktualizováno právě teď</p>
+            <p className="text-red-100 text-sm mt-1">Aktualizováno právě teď</p>
           </div>
         </div>
       </div>
@@ -131,21 +131,21 @@ export default function RealTimeDashboard({ data, onRoomClick }) {
 
 function MetricCard({ title, value, icon, color, subtitle }) {
   const colorClasses = {
-    blue: 'bg-blue-50 text-blue-600 border-blue-200',
-    green: 'bg-green-50 text-green-600 border-green-200',
-    yellow: 'bg-yellow-50 text-yellow-600 border-yellow-200',
-    red: 'bg-red-50 text-red-600 border-red-200',
+    blue: 'bg-[#fce7ed] border-[#C21533]',
+    green: 'bg-[#fce7ed] border-[#C21533]',
+    yellow: 'bg-[#fce7ed] border-[#C21533]',
+    red: 'bg-[#fce7ed] border-[#C21533]',
   };
 
   return (
     <div className={`${colorClasses[color]} border-2 rounded-lg p-6 transition-all hover:shadow-lg`}>
       <div className="flex justify-between items-start">
         <div className="flex-1">
-          <p className="text-sm font-medium opacity-80">{title}</p>
-          <p className="text-3xl font-bold mt-2">{value}</p>
-          <p className="text-xs opacity-70 mt-1">{subtitle}</p>
+          <p className="text-sm font-medium text-gray-900 opacity-80">{title}</p>
+          <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
+          <p className="text-xs text-gray-900 opacity-70 mt-1">{subtitle}</p>
         </div>
-        <div className="opacity-50">
+        <div className="opacity-50 text-gray-900">
           {icon}
         </div>
       </div>
