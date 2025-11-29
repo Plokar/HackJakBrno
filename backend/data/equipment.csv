@@ -1,0 +1,101 @@
+﻿Název Přístroje,Kategorie,Inventární Číslo (Pro Skenování),Odhadovaná Životnost (Provozní Hodiny),Fiktivní UDI-PI Datový Klíč (GS1 DataMatrix Data)
+Operační stůl (Elektrický) - Maquet,Operační stoly,A-OS-10001,45000,(01)08591234567891(11)241201(17)291130(21)AOS10001
+Anesteziologický přístroj (High-End),ARO vybavení,A-OS-10002,35000,(01)08591234567892(11)230515(17)280514(21)AOS10002
+Mobilní RTG C-Rameno (digitální),Zobrazování,A-OS-10003,28000,(01)08591234567893(11)240110(17)271231(21)AOS10003
+Centrální monitorovací stanice,Monitorování,A-OS-10004,55000,(01)08591234567894(11)230920(17)300919(21)AOS10004
+Stropní operační lampa (hlavní),Osvětlení,A-OS-10005,60000,(01)08591234567895(11)221101(17)321031(21)AOS10005
+Ventilátor (transportní),ARO vybavení,A-OS-10006,20000,(01)08591234567896(11)250218(17)280217(21)AOS10006
+Elektrokoagulátor (bipolární/monopolární),Diatermie,A-OS-10007,40000,(01)08591234567897(11)240725(17)310724(21)AOS10007
+Chirurgická odsávačka (vysoký výkon),Odsávání,A-OS-10008,48000,(01)08591234567898(11)230301(17)300228(21)AOS10008
+Laparoskopická věž (Full HD),Endoskopie/Laparoskopie,A-OS-10009,25000,(01)08591234567899(11)241010(17)291009(21)AOS10009
+Endoskopická kamera a zdroj světla,Endoskopie/Laparoskopie,A-OS-10010,22000,(01)08591234567900(11)241105(17)281104(21)AOS10010
+Peristaltická pumpa pro irigaci/aspiraci,Speciální pumpy,A-OS-10011,30000,(01)08591234567901(11)230812(17)290811(21)AOS10011
+Ultrazvukový přístroj (mobilní),Zobrazování,A-OS-10012,26000,(01)08591234567902(11)250101(17)281231(21)AOS10012
+Infuzní pumpa (dvoukanálová),ARO vybavení,A-OS-10013,42000,(01)08591234567903(11)240615(17)310614(21)AOS10013
+Injektomat (přesná aplikace léků),ARO vybavení,A-OS-10014,42000,(01)08591234567904(11)240615(17)310614(21)AOS10014
+Ohřívač krve a infuzních roztoků,ARO vybavení,A-OS-10015,38000,(01)08591234567905(11)230220(17)290219(21)AOS10015
+Mikroskop pro neurochirurgii/ORL,Mikrochirurgie,A-OS-10016,32000,(01)08591234567906(11)240905(17)310904(21)AOS10016
+Kryochirurgický přístroj,Speciální terapie,A-OS-10017,15000,(01)08591234567907(11)250310(17)270309(21)AOS10017
+Laserový systém (CO2),Speciální terapie,A-OS-10018,18000,(01)08591234567908(11)240501(17)270430(21)AOS10018
+Nádobí na nástroje (velký transportní vozík),Ostatní,A-OS-10019,Není relevantní,(01)08591234567909(11)220101(17)351231(21)AOS10019
+Laminární proudění (jednotka OS),VZT/Filtrace,A-OS-10020,80000,(01)08591234567910(11)210801(17)360731(21)AOS10020
+Operační stůl (Traumatologický),Operační stoly,A-OS-10021,35000,(01)08591234567911(11)230410(17)280409(21)AOS10021
+Anesteziologický přístroj (záložní),ARO vybavení,A-OS-10022,30000,(01)08591234567912(11)240105(17)270104(21)AOS10022
+RTG C-Rameno (menší model),Zobrazování,A-OS-10023,25000,(01)08591234567913(11)231120(17)271119(21)AOS10023
+Monitor pacientský (multifunkční),Monitorování,A-OS-10024,40000,(01)08591234567914(11)240815(17)300814(21)AOS10024
+Chirurgická lampa (satelitní),Osvětlení,A-OS-10025,60000,(01)08591234567915(11)230601(17)330531(21)AOS10025
+Ventilační jednotka (prodloužená podpora),ARO vybavení,A-OS-10026,32000,(01)08591234567916(11)250125(17)280124(21)AOS10026
+Elektrokoagulátor (argonový),Diatermie,A-OS-10027,36000,(01)08591234567917(11)240401(17)290331(21)AOS10027
+Ortopedická pila a vrtačka (motorová jednotka),Ortopedie,A-OS-10028,15000,(01)08591234567918(11)250320(17)270319(21)AOS10028
+Video systém pro artroskopii,Endoskopie/Laparoskopie,A-OS-10029,20000,(01)08591234567919(11)240214(17)270213(21)AOS10029
+Endoskopická pumpa na klouby,Speciální pumpy,A-OS-10030,28000,(01)08591234567920(11)231005(17)291004(21)AOS10030
+Vysokofrekvenční chirurgická jednotka,Diatermie,A-OS-10031,38000,(01)08591234567921(11)240901(17)300831(21)AOS10031
+Kardiochirurgická pumpa,Kardiologie,A-OS-10032,24000,(01)08591234567922(11)241115(17)281114(21)AOS10032
+Defibrilátor (s externím monitorem),ARO vybavení,A-OS-10033,30000,(01)08591234567923(11)230701(17)290630(21)AOS10033
+Monitor BIS (hloubka anestezie),Monitorování,A-OS-10034,40000,(01)08591234567924(11)240310(17)300309(21)AOS10034
+"Sterilizační autokláv (malý, rychlý)",Sterilizace,A-OS-10035,15000,(01)08591234567925(11)250201(17)270131(21)AOS10035
+Robota pro asistovanou chirurgii (základní modul),Robotická chirurgie,A-OS-10036,20000,(01)08591234567926(11)241210(17)281209(21)AOS10036
+ORL endoskopická věž,Endoskopie/Laparoskopie,A-OS-10037,23000,(01)08591234567927(11)240520(17)280519(21)AOS10037
+Perfuze pumpa (speciální),Speciální pumpy,A-OS-10038,29000,(01)08591234567928(11)230915(17)290914(21)AOS10038
+Operační stůl (Cévní chirurgie),Operační stoly,A-OS-10039,38000,(01)08591234567929(11)240701(17)300630(21)AOS10039
+Anesteziologický monitor (základní),ARO vybavení,A-OS-10040,35000,(01)08591234567930(11)230805(17)290804(21)AOS10040
+Skiaskopický stůl (kompaktní),Zobrazování,A-OS-10041,22000,(01)08591234567931(11)240315(17)270314(21)AOS10041
+Plynový analyzátor (monitor plynů),Monitorování,A-OS-10042,45000,(01)08591234567932(11)231201(17)311130(21)AOS10042
+Centrální vakuový systém (přípojná jednotka),Odsávání,A-OS-10043,50000,(01)08591234567933(11)221001(17)320930(21)AOS10043
+Ultrazvukový harmonický skalpel,Diatermie,A-OS-10044,20000,(01)08591234567934(11)250110(17)280109(21)AOS10044
+Stojan na infuze (elektricky výškově nastavitelný),Ostatní,A-OS-10045,50000,(01)08591234567935(11)230501(17)330430(21)AOS10045
+"Operační lampa (malá, lokální)",Osvětlení,A-OS-10046,55000,(01)08591234567936(11)240710(17)340709(21)AOS10046
+Přístroj na autotransfuze (Cell Saver),Kardiologie/Trauma,A-OS-10047,18000,(01)08591234567937(11)240925(17)270924(21)AOS10047
+Robotický držák kamery,Robotická chirurgie,A-OS-10048,20000,(01)08591234567938(11)241020(17)281019(21)AOS10048
+Tiskárna pro operační protokoly,Ostatní,A-OS-10049,20000,(01)08591234567939(11)230305(17)300304(21)AOS10049
+"Mobilní lékárnička (pojizdná, zabezpečená)",Ostatní,A-OS-10050,Není relevantní,(01)08591234567940(11)220601(17)350531(21)AOS10050
+Operační stůl (Neurochirurgie),Operační stoly,A-OS-10051,36000,(01)08591234567941(11)240201(17)290131(21)AOS10051
+Přístroj pro neuromonitoring,Monitorování,A-OS-10052,30000,(01)08591234567942(11)250410(17)300409(21)AOS10052
+RTG C-Rameno (s plochým detektorem),Zobrazování,A-OS-10053,30000,(01)08591234567943(11)231025(17)281024(21)AOS10053
+Anesteziologický přístroj (s integrovaným monit.),ARO vybavení,A-OS-10054,34000,(01)08591234567944(11)240605(17)290604(21)AOS10054
+Chirurgická konzole pro endoskopii,Endoskopie/Laparoskopie,A-OS-10055,24000,(01)08591234567945(11)250101(17)281231(21)AOS10055
+Infuzní pumpa (čtyřkanálová),ARO vybavení,A-OS-10056,40000,(01)08591234567946(11)240301(17)300228(21)AOS10056
+"Koagulátor (pro ORL, nízkofrekvenční)",Diatermie,A-OS-10057,35000,(01)08591234567947(11)230510(17)290509(21)AOS10057
+Chirurgická odsávačka (přenosná),Odsávání,A-OS-10058,30000,(01)08591234567948(11)240720(17)300719(21)AOS10058
+Endoskopický CO2 insuflátor,Laparoskopie,A-OS-10059,28000,(01)08591234567949(11)241101(17)291031(21)AOS10059
+Laserový holmiový systém,Speciální terapie,A-OS-10060,16000,(01)08591234567950(11)250420(17)270419(21)AOS10060
+Defibrilátor (manuální),ARO vybavení,A-OS-10061,25000,(01)08591234567951(11)230910(17)280909(21)AOS10061
+Přístroj na měření srdečního výdeje,Monitorování,A-OS-10062,33000,(01)08591234567952(11)240115(17)290114(21)AOS10062
+Centrální sterilizační jednotka (velkokapacitní),Sterilizace,A-OS-10063,40000,(01)08591234567953(11)231105(17)311104(21)AOS10063
+Robotický systém (servisní set),Robotická chirurgie,A-OS-10064,10000,(01)08591234567954(11)241220(17)271219(21)AOS10064
+Oční operační mikroskop,Mikrochirurgie,A-OS-10065,30000,(01)08591234567955(11)240501(17)290430(21)AOS10065
+Systém pro proplach ran (pulzní laváž),Speciální pumpy,A-OS-10066,15000,(01)08591234567956(11)250301(17)270228(21)AOS10066
+Operační stůl (Speciální polohování),Operační stoly,A-OS-10067,42000,(01)08591234567957(11)240415(17)310414(21)AOS10067
+Anesteziologická stropní ramena,ARO vybavení,A-OS-10068,60000,(01)08591234567958(11)230620(17)330619(21)AOS10068
+Intraoperační CT skener (mobilní),Zobrazování,A-OS-10069,25000,(01)08591234567959(11)240110(17)270109(21)AOS10069
+EEG monitor (hlavová aktivita),Monitorování,A-OS-10070,38000,(01)08591234567960(11)240905(17)300904(21)AOS10070
+Ultrazvukový disektor,Instrumentárium,A-OS-10071,21000,(01)08591234567961(11)240801(17)280731(21)AOS10071
+Krční operační lampa (přímé osvětlení),Osvětlení,A-OS-10072,58000,(01)08591234567962(11)231010(17)331009(21)AOS10072
+Infuzní pumpa (objemová),ARO vybavení,A-OS-10073,45000,(01)08591234567963(11)240501(17)310430(21)AOS10073
+Chirugická odsávačka (pro liposukci),Odsávání,A-OS-10074,25000,(01)08591234567964(11)250210(17)280209(21)AOS10074
+Endoskopická mycí a dezinfekční jednotka,Endoskopie/Laparoskopie,A-OS-10075,30000,(01)08591234567965(11)231201(17)291130(21)AOS10075
+Kardioverter/defibrilátor (interní),Kardiologie,A-OS-10076,18000,(01)08591234567966(11)240705(17)270704(21)AOS10076
+Terapeutický hypoterrmický systém,Speciální terapie,A-OS-10077,15000,(01)08591234567967(11)250315(17)270314(21)AOS10077
+Monitor periferní svalové relaxace,Monitorování,A-OS-10078,35000,(01)08591234567968(11)240401(17)300331(21)AOS10078
+Operační videorekordér (archivační),Endoskopie/Laparoskopie,A-OS-10079,40000,(01)08591234567969(11)230801(17)310731(21)AOS10079
+Přístroj pro ECMO (mimotělní oběh),Kardiologie,A-OS-10080,12000,(01)08591234567970(11)241215(17)261214(21)AOS10080
+Operační stůl (Plastická chirurgie),Operační stoly,A-OS-10081,40000,(01)08591234567971(11)230501(17)300430(21)AOS10081
+Monitor CO2 (kapnograf),Monitorování,A-OS-10082,48000,(01)08591234567972(11)240610(17)320609(21)AOS10082
+Digitální archivace snímků (server),Zobrazování,A-OS-10083,60000,(01)08591234567973(11)220901(17)350831(21)AOS10083
+Operační lampa LED (s regulací barvy),Osvětlení,A-OS-10084,60000,(01)08591234567974(11)231120(17)331119(21)AOS10084
+Ventilátor (Intenzivní péče),ARO vybavení,A-OS-10085,35000,(01)08591234567975(11)240101(17)291231(21)AOS10085
+Tkáňová svářečka (LigaSure),Diatermie,A-OS-10086,28000,(01)08591234567976(11)250205(17)290204(21)AOS10086
+Ultrazvukový kavitron,Instrumentárium,A-OS-10087,18000,(01)08591234567977(11)240810(17)270809(21)AOS10087
+Insuflátor (vysoký průtok),Laparoskopie,A-OS-10088,30000,(01)08591234567978(11)230415(17)290414(21)AOS10088
+Pult pro míchání kostního cementu,Ortopedie,A-OS-10089,15000,(01)08591234567979(11)250310(17)270309(21)AOS10089
+Stropní závěsný systém (jednoramenný),Ostatní,A-OS-10090,60000,(01)08591234567980(11)230701(17)330630(21)AOS10090
+Operační stůl (Gynekologie),Operační stoly,A-OS-10091,38000,(01)08591234567981(11)240510(17)300509(21)AOS10091
+Přístroj na měření tlaku do plicnice,Monitorování,A-OS-10092,26000,(01)08591234567982(11)250105(17)280104(21)AOS10092
+RTG mobilní (základní),Zobrazování,A-OS-10093,20000,(01)08591234567983(11)240901(17)270831(21)AOS10093
+Anesteziologický přístroj (s plnou dokumentací),ARO vybavení,A-OS-10094,33000,(01)08591234567984(11)240220(17)290219(21)AOS10094
+"Video monitor (velký, pro tým)",Endoskopie/Laparoskopie,A-OS-10095,50000,(01)08591234567985(11)231101(17)331031(21)AOS10095
+Injektomat (jednokanálový),ARO vybavení,A-OS-10096,45000,(01)08591234567986(11)240601(17)310531(21)AOS10096
+Plovací vozík na anestezii,ARO vybavení,A-OS-10097,Není relevantní,(01)08591234567987(11)220101(17)351231(21)AOS10097
+"Odsávačka (malá, pro lokální sání)",Odsávání,A-OS-10098,25000,(01)08591234567988(11)240820(17)290819(21)AOS10098
+"Sterilizační autokláv (velký, centrální)",Sterilizace,A-OS-10099,50000,(01)08591234567989(11)230301(17)330228(21)AOS10099
+Řídící jednotka inteligentního OS,Ostatní,A-OS-10100,60000,(01)08591234567990(11)241001(17)340930(21)AOS10100
