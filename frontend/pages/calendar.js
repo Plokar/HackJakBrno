@@ -100,9 +100,9 @@ export default function CalendarPage() {
 
   const handleDateSelect = (selectInfo) => {
     console.log('Date selected:', selectInfo);
-    // Admins nemůžou vytvářet operace kliknutím na prázdné datum
-    if (isAdmin) {
-      console.log('Admin cannot create operations by selecting dates');
+    // Admins a sestry nemůžou vytvářet operace kliknutím na prázdné datum
+    if (isAdmin || isNurse) {
+      console.log('Admin/Nurse cannot create operations by selecting dates');
       return;
     }
     // Uložit vybraný časový úsek včetně roomId
@@ -115,9 +115,9 @@ export default function CalendarPage() {
   };
 
   const handleAddOperation = () => {
-    // Admins nemůžou vytvářet nové operace
-    if (isAdmin) {
-      console.log('Admin cannot create new operations');
+    // Admins a sestry nemůžou vytvářet nové operace
+    if (isAdmin || isNurse) {
+      console.log('Admin/Nurse cannot create new operations');
       return;
     }
     // Reset vybraného času při ručním otevření modalu
