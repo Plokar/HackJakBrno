@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 
-export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [], doctors = [], initialTimeSlot = null }) {
+export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [], doctors = [], initialTimeSlot = null, currentRole = 'doctor' }) {
+  const isDoctor = currentRole === 'doctor';
+  const isAdmin = currentRole === 'admin';
+  const isNurse = currentRole === 'nurse';
+  
   const [formData, setFormData] = useState({
     // Operation info
     operationType: '',
@@ -39,13 +43,14 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
-  // Předvyplnit časy z vybraného časového úseku
+  // Předvyplnit časy a sál z vybraného časového úseku
   useEffect(() => {
     if (initialTimeSlot && isOpen) {
       setFormData(prev => ({
         ...prev,
         scheduledStart: formatDateTimeLocal(initialTimeSlot.start),
-        scheduledEnd: formatDateTimeLocal(initialTimeSlot.end)
+        scheduledEnd: formatDateTimeLocal(initialTimeSlot.end),
+        operatingRoomId: initialTimeSlot.roomId || prev.operatingRoomId  // Předvyplnit sál, pokud je vybrán
       }));
     }
   }, [initialTimeSlot, isOpen]);
@@ -156,26 +161,34 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
   const validateForm = () => {
     const newErrors = {};
 
-    // Operation validation
-    if (!formData.operationType) newErrors.operationType = 'Vyberte typ operace';
-    if (!formData.operatingRoomId) newErrors.operatingRoomId = 'Vyberte operační sál';
-    if (!formData.primaryDoctorId) newErrors.primaryDoctorId = 'Vyberte primárního lékaře';
-    if (!formData.scheduledStart) newErrors.scheduledStart = 'Zadejte začátek operace';
-    if (!formData.scheduledEnd) newErrors.scheduledEnd = 'Zadejte konec operace';
+    // Doktor vyplňuje jen pacienta a diagnostiku
+    if (isDoctor) {
+      if (!formData.patientFirstName) newErrors.patientFirstName = 'Zadejte jméno pacienta';
+      if (!formData.patientLastName) newErrors.patientLastName = 'Zadejte příjmení pacienta';
+      if (!formData.patientBirthNumber) newErrors.patientBirthNumber = 'Zadejte rodné číslo';
+      if (!formData.patientDateOfBirth) newErrors.patientDateOfBirth = 'Zadejte datum narození';
+      if (!formData.patientDiagnosis) newErrors.patientDiagnosis = 'Zadejte diagnózu';
+    }
     
-    // Patient validation
-    if (!formData.patientFirstName) newErrors.patientFirstName = 'Zadejte jméno pacienta';
-    if (!formData.patientLastName) newErrors.patientLastName = 'Zadejte příjmení pacienta';
-    if (!formData.patientBirthNumber) newErrors.patientBirthNumber = 'Zadejte rodné číslo';
-    if (!formData.patientDateOfBirth) newErrors.patientDateOfBirth = 'Zadejte datum narození';
-    if (!formData.patientDiagnosis) newErrors.patientDiagnosis = 'Zadejte diagnózu';
-
-    // Check if end time is after start time
-    if (formData.scheduledStart && formData.scheduledEnd) {
-      const start = new Date(formData.scheduledStart);
-      const end = new Date(formData.scheduledEnd);
-      if (end <= start) {
-        newErrors.scheduledEnd = 'Konec operace musí být po začátku';
+    // Sestra vyplňuje typ operace a personál
+    if (isNurse) {
+      if (!formData.operationType) newErrors.operationType = 'Vyberte typ operace';
+      if (!formData.primaryDoctorId) newErrors.primaryDoctorId = 'Vyberte primárního lékaře';
+    }
+    
+    // Admin potvrzuje datum a sál
+    if (isAdmin) {
+      if (!formData.operatingRoomId) newErrors.operatingRoomId = 'Vyberte operační sál';
+      if (!formData.scheduledStart) newErrors.scheduledStart = 'Zadejte začátek operace';
+      if (!formData.scheduledEnd) newErrors.scheduledEnd = 'Zadejte konec operace';
+      
+      // Check if end time is after start time
+      if (formData.scheduledStart && formData.scheduledEnd) {
+        const start = new Date(formData.scheduledStart);
+        const end = new Date(formData.scheduledEnd);
+        if (end <= start) {
+          newErrors.scheduledEnd = 'Konec operace musí být po začátku';
+        }
       }
     }
 
@@ -218,10 +231,12 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
         {/* Modal panel */}
         <div className="inline-block w-full max-w-4xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white rounded-lg shadow-xl">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-4">
+          <div className="bg-gradient-to-r from-[#C21533] to-[#8f0f26] px-6 py-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-bold text-white">
-                Přidat novou operaci
+                {isDoctor && 'Vytvořit žádost o operaci'}
+                {isAdmin && 'Schválit operaci'}
+                {isNurse && 'Přidat detaily operace'}
               </h3>
               <button
                 onClick={handleClose}
@@ -242,7 +257,8 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
               </div>
             )}
 
-            {/* Operation Information Section */}
+            {/* Operation Information Section - pouze pro sestru */}
+            {isNurse && (
             <div className="mb-6">
               <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <span className="text-2xl mr-2">⚕️</span>
@@ -257,7 +273,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     name="operationType"
                     value={formData.operationType}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.operationType ? 'border-red-300' : 'border-gray-300'
                     }`}
                   >
@@ -279,7 +295,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     name="operatingRoomId"
                     value={formData.operatingRoomId}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.operatingRoomId ? 'border-red-300' : 'border-gray-300'
                     }`}
                   >
@@ -301,7 +317,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     name="primaryDoctorId"
                     value={formData.primaryDoctorId}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.primaryDoctorId ? 'border-red-300' : 'border-gray-300'
                     }`}
                   >
@@ -317,6 +333,102 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                   )}
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Začátek operace <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    name="scheduledStart"
+                    value={formData.scheduledStart}
+                    onChange={handleChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
+                      errors.scheduledStart ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                  />
+                  {errors.scheduledStart && (
+                    <p className="mt-1 text-xs text-red-500">{errors.scheduledStart}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Konec operace <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    name="scheduledEnd"
+                    value={formData.scheduledEnd}
+                    onChange={handleChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
+                      errors.scheduledEnd ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                  />
+                  {errors.scheduledEnd && (
+                    <p className="mt-1 text-xs text-red-500">{errors.scheduledEnd}</p>
+                  )}
+                </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    name="isEmergency"
+                    checked={formData.isEmergency}
+                    onChange={handleChange}
+                    className="w-4 h-4 text-[#C21533] border-gray-300 rounded focus:ring-[#C21533]"
+                  />
+                  <label className="ml-2 text-sm font-medium text-gray-700">
+                    Urgentní operace
+                  </label>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Poznámky
+                  </label>
+                  <textarea
+                    name="notes"
+                    value={formData.notes}
+                    onChange={handleChange}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent"
+                    placeholder="Dodatečné informace o operaci..."
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+            )}
+
+            {/* Scheduling Section - pouze pro admina */}
+            {isAdmin && (
+            <div className="mb-6">
+              <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <span className="text-2xl mr-2">📅</span>
+                Schválení a plánování
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Operační sál <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="operatingRoomId"
+                    value={formData.operatingRoomId}
+                    onChange={handleChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      errors.operatingRoomId ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                  >
+                    <option value="">Vyberte operační sál</option>
+                    {rooms.map(room => (
+                      <option key={room.id} value={room.id}>{room.name}</option>
+                    ))}
+                  </select>
+                  {errors.operatingRoomId && (
+                    <p className="mt-1 text-xs text-red-500">{errors.operatingRoomId}</p>
+                  )}
+                </div>
+                
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Začátek operace <span className="text-red-500">*</span>
@@ -352,37 +464,12 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     <p className="mt-1 text-xs text-red-500">{errors.scheduledEnd}</p>
                   )}
                 </div>
-
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    name="isEmergency"
-                    checked={formData.isEmergency}
-                    onChange={handleChange}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <label className="ml-2 text-sm font-medium text-gray-700">
-                    Urgentní operace
-                  </label>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Poznámky
-                  </label>
-                  <textarea
-                    name="notes"
-                    value={formData.notes}
-                    onChange={handleChange}
-                    rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Dodatečné informace o operaci..."
-                  ></textarea>
-                </div>
               </div>
             </div>
+            )}
 
-            {/* Patient Information Section */}
+            {/* Patient Information Section - pouze pro doktora */}
+            {isDoctor && (
             <div className="mb-6 pt-6 border-t border-gray-200">
               <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <span className="text-2xl mr-2">👤</span>
@@ -390,7 +477,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
               </h4>
               
               {/* Rodné číslo a tlačítko pro načtení */}
-              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="mb-4 p-4 bg-[#fce7ed] border border-[#C21533] rounded-lg">
                 <div className="flex items-end gap-3">
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -401,7 +488,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                       name="patientBirthNumber"
                       value={formData.patientBirthNumber}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                         errors.patientBirthNumber ? 'border-red-300' : 'border-gray-300'
                       }`}
                       placeholder="123456/7890"
@@ -414,7 +501,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     type="button"
                     onClick={handleLoadPatient}
                     disabled={isLoadingPatient || !formData.patientBirthNumber}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-4 py-2 bg-[#C21533] text-white rounded-lg hover:bg-[#8f0f26] transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {isLoadingPatient ? (
                       <>
@@ -453,7 +540,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     name="patientFirstName"
                     value={formData.patientFirstName}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.patientFirstName ? 'border-red-300' : 'border-gray-300'
                     } ${isPatientLoaded ? 'bg-green-50' : ''}`}
                     placeholder="Jan"
@@ -473,7 +560,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     name="patientLastName"
                     value={formData.patientLastName}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.patientLastName ? 'border-red-300' : 'border-gray-300'
                     } ${isPatientLoaded ? 'bg-green-50' : ''}`}
                     placeholder="Novák"
@@ -493,7 +580,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     name="patientDateOfBirth"
                     value={formData.patientDateOfBirth}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.patientDateOfBirth ? 'border-red-300' : 'border-gray-300'
                     } ${isPatientLoaded ? 'bg-green-50' : ''}`}
                   />
@@ -512,7 +599,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     value={formData.patientDiagnosis}
                     onChange={handleChange}
                     rows={2}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.patientDiagnosis ? 'border-red-300' : 'border-gray-300'
                     } ${isPatientLoaded ? 'bg-green-50' : ''}`}
                     placeholder="Popis diagnózy..."
@@ -532,7 +619,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     value={formData.patientMedicalHistory}
                     onChange={handleChange}
                     rows={3}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       isPatientLoaded ? 'bg-green-50' : ''
                     }`}
                     placeholder="Předchozí zdravotní problémy, alergie, léky..."
@@ -540,6 +627,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                 </div>
               </div>
             </div>
+            )}
 
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
@@ -553,10 +641,15 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
               </button>
               <button
                 type="submit"
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-[#C21533] text-white rounded-lg hover:bg-[#8f0f26] transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Ukládám...' : 'Uložit operaci'}
+                {isSubmitting ? 'Ukládám...' : (
+                  isDoctor ? 'Vytvořit žádost' :
+                  isAdmin ? 'Schválit operaci' :
+                  isNurse ? 'Uložit detaily' :
+                  'Uložit operaci'
+                )}
               </button>
             </div>
           </form>

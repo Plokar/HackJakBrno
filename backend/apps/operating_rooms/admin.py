@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     OperatingRoom, Patient, Doctor, Equipment, Material,
-    Operation, PerioperativeProtocol, EquipmentUsage, MaterialUsage
+    Operation, PerioperativeProtocol, EquipmentUsage, MaterialUsage,
+    OperationTool
 )
 
 
@@ -61,3 +62,22 @@ class EquipmentUsageAdmin(admin.ModelAdmin):
 @admin.register(MaterialUsage)
 class MaterialUsageAdmin(admin.ModelAdmin):
     list_display = ['protocol', 'material', 'quantity_used', 'cost', 'scanned_at']
+
+
+@admin.register(OperationTool)
+class OperationToolAdmin(admin.ModelAdmin):
+    list_display = ['name', 'category', 'inventory_code', 'sterilization_cost', 'quantity', 'status', 'is_low_stock']
+    list_filter = ['status', 'category', 'unit']
+    search_fields = ['name', 'category', 'inventory_code', 'udi_code', 'description']
+    readonly_fields = ['is_low_stock']
+    fieldsets = (
+        ('Základní informace', {
+            'fields': ('name', 'category', 'inventory_code', 'udi_code')
+        }),
+        ('Náklady a životnost', {
+            'fields': ('sterilization_cost', 'quantity', 'lifespan', 'unit', 'status')
+        }),
+        ('Další', {
+            'fields': ('description', 'is_low_stock', 'created_at', 'updated_at')
+        }),
+    )

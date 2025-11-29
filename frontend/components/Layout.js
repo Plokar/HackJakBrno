@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { useRole } from '../lib/RoleContext';
 import { 
   HomeIcon, 
   CalendarIcon, 
@@ -16,6 +17,7 @@ import classNames from 'classnames';
 
 export default function Layout({ children, currentUser }) {
   const router = useRouter();
+  const { currentRole, changeRole, isDoctor, isAdmin, isNurse } = useRole();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -37,19 +39,23 @@ export default function Layout({ children, currentUser }) {
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [activeUser, setActiveUser] = useState({
-    name: 'Admin',
-    role: 'Administrátor',
-    avatar: '👨‍💼'
+    name: 'Dr. Novák',
+    role: 'doctor',
+    roleLabel: 'Doktor',
+    avatar: '👨‍⚕️'
   });
 
   const availableUsers = [
-    { name: 'Admin', role: 'Administrátor', avatar: '👨‍💼' },
-    { name: 'Sestřička', role: 'Zdravotní sestra', avatar: '👩‍⚕️' }
+    { name: 'Dr. Novák', role: 'doctor', roleLabel: 'Doktor', avatar: '👨‍⚕️' },
+    { name: 'Admin Svobodová', role: 'admin', roleLabel: 'Administrátor', avatar: '👨‍💼' },
+    { name: 'Sestra Dvořáková', role: 'nurse', roleLabel: 'Zdravotní sestra', avatar: '👩‍⚕️' }
   ];
 
   const handleUserSwitch = (user) => {
     setActiveUser(user);
     setUserMenuOpen(false);
+    changeRole(user.role); // Změna role v kontextu
+    console.log('Přepnuto na roli:', user.role);
   };
 
   const navigation = [
@@ -112,22 +118,22 @@ export default function Layout({ children, currentUser }) {
         <div className="absolute bottom-0 w-full p-4 border-t border-gray-200">
           {/* User Switch Menu - umístěno nad tlačítko */}
           {userMenuOpen && (
-            <div className="mb-2 py-2 bg-white border border-gray-200 rounded-lg shadow-lg">
+            <div className="mb-2 py-2 bg-white border border-gray-200 rounded-lg shadow-lg max-w-xs">
               {availableUsers.map((user) => (
                 <button
                   key={user.name}
                   onClick={() => handleUserSwitch(user)}
-                  className={`w-full flex items-center px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${
+                  className={`w-full flex items-start px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${
                     activeUser.name === user.name ? 'bg-blue-50' : ''
                   }`}
                 >
-                  <span className="text-xl mr-3">{user.avatar}</span>
-                  <div className="text-left">
+                  <span className="text-xl mr-3 mt-0.5">{user.avatar}</span>
+                  <div className="text-left flex-1">
                     <p className="font-medium text-gray-900">{user.name}</p>
-                    <p className="text-xs text-gray-500">{user.role}</p>
+                    <p className="text-xs text-gray-500">{user.roleLabel}</p>
                   </div>
                   {activeUser.name === user.name && (
-                    <svg className="w-4 h-4 ml-auto text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 ml-2 mt-1 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   )}
@@ -148,7 +154,7 @@ export default function Layout({ children, currentUser }) {
                 {activeUser.name}
               </p>
               <p className="text-xs text-gray-500 truncate">
-                {activeUser.role}
+                {activeUser.roleLabel}
               </p>
             </div>
             <svg 

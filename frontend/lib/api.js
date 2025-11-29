@@ -3,22 +3,37 @@
  * Profesionální implementace s error handlingem a retry logikou
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// V Dockeru používáme Next.js proxy
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 class ApiClient {
   constructor() {
     this.baseURL = API_BASE_URL;
     this.timeout = 30000; // 30 sekund
+    this.useProxy = API_BASE_URL.startsWith('/api/proxy');
+    this.currentRole = 'doctor'; // Default role
+  }
+
+  /**
+   * Nastavit aktuální roli uživatele pro mock autentizaci
+   */
+  setUserRole(role) {
+    this.currentRole = role;
   }
 
   /**
    * Generická metoda pro HTTP requesty s retry logikou
    */
   async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
+    // Pokud používáme proxy, upravíme endpoint
+    const url = this.useProxy 
+      ? endpoint.replace('/api/', '/api/proxy/')
+      : `${this.baseURL}${endpoint}`;
+      
     const config = {
       headers: {
         'Content-Type': 'application/json',
+        'X-User-Role': this.currentRole, // Přidat header pro mock autentizaci
         ...options.headers,
       },
       ...options,
@@ -142,6 +157,12 @@ class ApiClient {
     active: () => this.get('/api/medic/operations/active/'),
     start: (id) => this.post(`/api/medic/operations/${id}/start/`, {}),
     complete: (id) => this.post(`/api/medic/operations/${id}/complete/`, {}),
+    
+    // Workflow actions
+    submitForApproval: (id) => this.post(`/api/medic/operations/${id}/submit-for-approval/`, {}),
+    approve: (id, approved = true, notes = '') => 
+      this.post(`/api/medic/operations/${id}/approve/`, { approved, notes }),
+    assignStaff: (id, data) => this.post(`/api/medic/operations/${id}/assign-staff/`, data),
   };
 
   /**
@@ -216,6 +237,7 @@ class ApiClient {
         quantity_used: quantityUsed 
       }),
   };
+
 }
 
 // Singleton instance

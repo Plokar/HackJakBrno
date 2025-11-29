@@ -72,6 +72,40 @@ class RateLimitMiddleware:
         return True
 
 
+class MockAuthMiddleware:
+    """
+    Mock autentizace pro DEMO - pouze nastaví mock uživatele s rolí z headeru
+    NEVYTVÁŘÍ žádné uživatele v databázi!
+    """
+    def __init__(self, get_response):
+        self.get_response = get_response
+    
+    def __call__(self, request):
+        # Vytvořit mock uživatele přímo v paměti (ne v databázi)
+        role = request.headers.get('X-User-Role', 'doctor')
+        
+        # Vytvořit mock objekt uživatele
+        class MockUser:
+            is_authenticated = True
+            is_active = True
+            is_staff = False
+            is_superuser = False
+            
+            def __init__(self, role):
+                self.username = role
+                self.email = f'{role}@demo.cz'
+                self.profile = type('Profile', (), {'role': role})()
+            
+            def __str__(self):
+                return f"MockUser({self.username})"
+        
+        request.user = MockUser(role)
+        request._cached_user = request.user
+        
+        response = self.get_response(request)
+        return response
+
+
 class SecurityHeadersMiddleware:
     """
     Middleware pro přidání dalších security headers

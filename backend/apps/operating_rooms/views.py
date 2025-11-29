@@ -1,18 +1,25 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import IsAuthenticated
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from datetime import datetime, timedelta
+import csv
+import io
 from .models import (
     OperatingRoom, Patient, Doctor, Equipment, Material,
-    Operation, PerioperativeProtocol, EquipmentUsage, MaterialUsage
+    Operation, PerioperativeProtocol, EquipmentUsage, MaterialUsage,
+    OperationTool
 )
 from .serializers import (
     OperatingRoomSerializer, PatientSerializer, DoctorSerializer,
     EquipmentSerializer, MaterialSerializer, OperationListSerializer,
     OperationDetailSerializer, OperationCreateSerializer, PerioperativeProtocolSerializer,
-    DashboardStatsSerializer, EquipmentUsageSerializer, MaterialUsageSerializer
+    DashboardStatsSerializer, EquipmentUsageSerializer, MaterialUsageSerializer,
+    OperationToolSerializer,
+    OperationApprovalSerializer, OperationStaffAssignmentSerializer
 )
 
 
@@ -258,6 +265,7 @@ class MaterialViewSet(viewsets.ModelViewSet):
 
 class OperationViewSet(viewsets.ModelViewSet):
     queryset = Operation.objects.all().order_by('-created_at')  # Nejnovější operace první
+    # permission_classes = [IsAuthenticated]  # Vypnuto pro demo - používáme MockAuthMiddleware
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -266,15 +274,165 @@ class OperationViewSet(viewsets.ModelViewSet):
             return OperationDetailSerializer
         return OperationListSerializer
     
+    def get_serializer_context(self):
+        """Přidat request do kontextu serializeru"""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+    
     def create(self, request, *args, **kwargs):
-        """Vytvoření nové operace včetně pacienta"""
+        """Vytvoření nové operace - pouze pro doktory"""
+        # Kontrola, že uživatel je doktor
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'doctor':
+            return Response(
+                {'error': 'Pouze doktoři mohou vytvářet operace'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
         operation = serializer.save()
         
         # Vrátit detailní serializér pro odpověď
         response_serializer = OperationDetailSerializer(operation)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+    
+    @action(detail=True, methods=['post'], url_path='submit-for-approval')
+    def submit_for_approval(self, request, pk=None):
+        """Odeslat operaci ke schválení - pouze doktor, který ji vytvořil"""
+        operation = self.get_object()
+        
+        # Kontrola oprávnění (pro DEMO: pokud je created_by NULL, povolit)
+        if operation.created_by and operation.created_by != request.user:
+            return Response(
+                {'error': 'Můžete odeslat ke schválení pouze své operace'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if operation.status != 'draft':
+            return Response(
+                {'error': 'Operaci lze odeslat ke schválení pouze ve stavu "Návrh"'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        operation.status = 'pending_approval'
+        operation.save()
+        
+        serializer = self.get_serializer(operation)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve_operation(self, request, pk=None):
+        """Schválit operaci - pouze admin"""
+        operation = self.get_object()
+        
+        # Kontrola, že uživatel je admin
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'admin':
+            return Response(
+                {'error': 'Pouze administrátoři mohou schvalovat operace'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if operation.status != 'pending_approval':
+            return Response(
+                {'error': 'Operaci lze schválit pouze ve stavu "Čeká na schválení"'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        print(f"DEBUG approve: request.data = {request.data}")
+        serializer = OperationApprovalSerializer(data=request.data)
+        if not serializer.is_valid():
+            print(f"DEBUG approve: serializer.errors = {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        if serializer.validated_data['approved']:
+            operation.status = 'approved'
+            # Pro DEMO: approved_by nastavit na None, protože MockUser není Django User
+            operation.approved_by = None
+            operation.approved_at = timezone.now()
+            if serializer.validated_data.get('notes'):
+                operation.notes = f"{operation.notes}\n\nPoznámka admina: {serializer.validated_data['notes']}"
+            operation.save()
+            response_serializer = OperationDetailSerializer(operation)
+            return Response(response_serializer.data)
+        else:
+            # Operace zamítnuta - smazat ji
+            operation.delete()
+            return Response(
+                {'message': 'Operace byla zamítnuta a smazána', 'reason': serializer.validated_data.get('notes', '')},
+                status=status.HTTP_200_OK
+            )
+    
+    @action(detail=True, methods=['post'], url_path='assign-staff')
+    def assign_staff(self, request, pk=None):
+        """Přiřadit personál k operaci - pouze sestra"""
+        operation = self.get_object()
+        
+        # Kontrola, že uživatel je sestra
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'nurse':
+            return Response(
+                {'error': 'Pouze sestry mohou přiřazovat personál'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if operation.status != 'approved':
+            return Response(
+                {'error': 'Personál lze přiřadit pouze ke schválené operaci'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = OperationStaffAssignmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Přiřadit asistující doktory
+        if 'assisting_doctor_ids' in serializer.validated_data:
+            operation.assisting_doctors.set(serializer.validated_data['assisting_doctor_ids'])
+        
+        # Aktualizovat poznámky
+        if serializer.validated_data.get('notes'):
+            operation.notes = f"{operation.notes}\n\nPoznámka sestry: {serializer.validated_data['notes']}"
+        
+        # Změnit status na naplánováno
+        operation.status = 'scheduled'
+        operation.save()
+        
+        response_serializer = OperationDetailSerializer(operation)
+        return Response(response_serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def my_operations(self, request):
+        """Operace vytvořené přihlášeným uživatelem"""
+        operations = Operation.objects.filter(created_by=request.user)
+        serializer = self.get_serializer(operations, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], url_path='pending-approval')
+    def pending_approval(self, request):
+        """Operace čekající na schválení - pro adminy"""
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'admin':
+            return Response(
+                {'error': 'Pouze administrátoři mohou zobrazit operace čekající na schválení'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        operations = Operation.objects.filter(status='pending_approval')
+        serializer = self.get_serializer(operations, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], url_path='approved-operations')
+    def approved_operations(self, request):
+        """Schválené operace čekající na přiřazení personálu - pro sestry"""
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'nurse':
+            return Response(
+                {'error': 'Pouze sestry mohou zobrazit schválené operace'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        operations = Operation.objects.filter(status='approved')
+        serializer = self.get_serializer(operations, many=True)
+        return Response(serializer.data)
     
     @action(detail=False, methods=['get'])
     def today(self, request):
@@ -466,3 +624,166 @@ class DashboardViewSet(viewsets.ViewSet):
         }
         
         return Response(data)
+
+
+class OperationToolViewSet(viewsets.ModelViewSet):
+    """ViewSet pro správu operačních nástrojů s podporou CSV importu"""
+    queryset = OperationTool.objects.all()
+    serializer_class = OperationToolSerializer
+    parser_classes = [MultiPartParser, FormParser]
+    
+    @action(detail=False, methods=['post'], url_path='upload-csv')
+    def upload_csv(self, request):
+        """
+        Upload CSV souboru s nástroji a import do databáze
+        
+        Očekávaný formát CSV (semicolon-delimited):
+        #;Název Nástroje;Kategorie;Fiktivní Inventární Kód;Cena Sterilizace (Kč/Použití Fikt.);UDI DataMatrix Kód (GS1 Formát)
+        """
+        if 'file' not in request.FILES:
+            return Response(
+                {'error': 'Soubor nebyl nahrán. Použijte klíč "file" pro upload.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        csv_file = request.FILES['file']
+        
+        # Ověření, že se jedná o CSV soubor
+        if not csv_file.name.endswith('.csv'):
+            return Response(
+                {'error': 'Soubor musí být ve formátu CSV (.csv)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Přečtení CSV souboru (semicolon delimiter, UTF-8-sig pro BOM)
+            decoded_file = csv_file.read().decode('utf-8-sig')
+            io_string = io.StringIO(decoded_file)
+            reader = csv.DictReader(io_string, delimiter=';')
+            
+            imported = 0
+            updated = 0
+            errors = []
+            
+            for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is row 1)
+                try:
+                    # Mapování CSV sloupců na model fields (Czech column names)
+                    name = row.get('Název Nástroje', '').strip()
+                    category = row.get('Kategorie', '').strip()
+                    inventory_code = row.get('Fiktivní Inventární Kód', '').strip()
+                    sterilization_cost_str = row.get('Cena Sterilizace (Kč/Použití Fikt.)', '').strip()
+                    udi_code = row.get('UDI DataMatrix Kód (GS1 Formát)', '').strip()
+                    
+                    # Validace povinných polí
+                    if not name:
+                        errors.append(f'Řádek {row_num}: Chybí název nástroje')
+                        continue
+                    
+                    if not category:
+                        errors.append(f'Řádek {row_num}: Chybí kategorie')
+                        continue
+                    
+                    # Konverze ceny sterilizace (Czech format: comma as decimal separator)
+                    sterilization_cost = None
+                    if sterilization_cost_str:
+                        try:
+                            # Nahradit čárku tečkou pro Python float
+                            cost_str = sterilization_cost_str.replace(',', '.')
+                            sterilization_cost = float(cost_str)
+                        except ValueError:
+                            errors.append(f'Řádek {row_num}: Neplatná cena sterilizace: {sterilization_cost_str}')
+                            # Continue anyway, set to None
+                    
+                    # Výchozí hodnoty
+                    quantity = 0  # Not in CSV, default to 0
+                    lifespan = None  # Not in CSV
+                    unit = 'použití'  # Default
+                    status_val = 'good'  # Default
+                    
+                    # Automatické určení statusu na základě ceny (volitelné)
+                    if sterilization_cost:
+                        if sterilization_cost > 50:
+                            status_val = 'warning'
+                        elif sterilization_cost > 60:
+                            status_val = 'critical'
+                    
+                    # Vytvoření nebo aktualizace záznamu (podle inventárního kódu nebo názvu)
+                    lookup_field = {}
+                    if inventory_code:
+                        lookup_field['inventory_code'] = inventory_code
+                    else:
+                        lookup_field['name'] = name
+                        lookup_field['category'] = category
+                    
+                    tool, created = OperationTool.objects.update_or_create(
+                        **lookup_field,
+                        defaults={
+                            'name': name,
+                            'category': category,
+                            'inventory_code': inventory_code if inventory_code else None,
+                            'sterilization_cost': sterilization_cost,
+                            'udi_code': udi_code if udi_code else None,
+                            'quantity': quantity,
+                            'lifespan': lifespan,
+                            'unit': unit,
+                            'status': status_val,
+                        }
+                    )
+                    
+                    if created:
+                        imported += 1
+                    else:
+                        updated += 1
+                        
+                except Exception as e:
+                    errors.append(f'Řádek {row_num}: Chyba při zpracování - {str(e)}')
+                    continue
+            
+            result = {
+                'message': 'CSV soubor byl úspěšně zpracován',
+                'imported': imported,
+                'updated': updated,
+                'total_processed': imported + updated,
+            }
+            
+            if errors:
+                result['errors'] = errors
+                result['error_count'] = len(errors)
+            
+            return Response(result, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Chyba při zpracování CSV souboru: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    @action(detail=False, methods=['get'], url_path='export-csv')
+    def export_csv(self, request):
+        """
+        Export všech nástrojů do CSV formátu (semicolon-delimited, Czech format)
+        """
+        response = Response(content_type='text/csv; charset=utf-8-sig')
+        response['Content-Disposition'] = 'attachment; filename="operation_tools.csv"'
+        
+        writer = csv.writer(response, delimiter=';')
+        writer.writerow(['#', 'Název Nástroje', 'Kategorie', 'Fiktivní Inventární Kód', 
+                        'Cena Sterilizace (Kč/Použití Fikt.)', 'UDI DataMatrix Kód (GS1 Formát)'])
+        
+        tools = OperationTool.objects.all()
+        for idx, tool in enumerate(tools, start=1):
+            # Konverze ceny zpět na český formát (čárka místo tečky)
+            cost_str = ''
+            if tool.sterilization_cost:
+                cost_str = str(tool.sterilization_cost).replace('.', ',')
+            
+            writer.writerow([
+                idx,
+                tool.name,
+                tool.category,
+                tool.inventory_code or '',
+                cost_str,
+                tool.udi_code or ''
+            ])
+        
+        return response
