@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *.sqlite3
 *.pyc
+Data1.xlsx
+Data2.xlsx
+~$data1.xlsx
+~$data2.xlsx
 .env
 .env.local
 .env.production
