@@ -46,7 +46,7 @@ export default function StaffList({ staff = [], onStaffClick }) {
               placeholder="Hledat lékaře (jméno, číslo licence, ID)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#E00034] focus:border-transparent"
             />
           </div>
 
@@ -54,7 +54,15 @@ export default function StaffList({ staff = [], onStaffClick }) {
           <select
             value={filterSpecialization}
             onChange={(e) => setFilterSpecialization(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="pl-4 pr-10 py-2 border-2 rounded-lg appearance-none bg-white focus:ring-2 focus:border-transparent"
+            style={{ 
+              borderColor: '#E00034',
+              '--tw-ring-color': '#E00034',
+              backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")", 
+              backgroundPosition: 'right 0.5rem center', 
+              backgroundRepeat: 'no-repeat', 
+              backgroundSize: '1.5em 1.5em'
+            }}
           >
             <option value="all">Všechny specializace</option>
             {specializations.map(spec => (
@@ -107,8 +115,8 @@ export default function StaffList({ staff = [], onStaffClick }) {
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="bg-blue-100 rounded-full p-2 mr-3">
-                          <UserIcon className="h-6 w-6 text-blue-600" />
+                        <div className="rounded-full p-2 mr-3" style={{ backgroundColor: '#fce7ed' }}>
+                          <UserIcon className="h-6 w-6" style={{ color: '#E00034' }} />
                         </div>
                         <div>
                           <div className="text-sm font-medium text-gray-900">
@@ -149,7 +157,7 @@ export default function StaffList({ staff = [], onStaffClick }) {
                           e.stopPropagation();
                           onStaffClick && onStaffClick(person);
                         }}
-                        className="text-blue-600 hover:text-blue-900 transition-colors"
+                        className="transition-colors hover:opacity-80" style={{ color: '#E00034' }}
                       >
                         Detail
                       </button>
