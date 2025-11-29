@@ -15,6 +15,15 @@ services:
       - app-network
     # Nepublikujeme port ven v produkci
 
+  redis:
+    image: redis:7-alpine
+    container_name: medichub_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+
   backend:
     build: 
       context: ./backend
@@ -25,11 +34,15 @@ services:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings_prod
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     networks:
       - app-network
       - korex_space_korex_network  # Připojení do KOREX nginx sítě
     depends_on:
       - db
+      - redis
+      - fhir-server
     restart: unless-stopped
 
   frontend:
@@ -48,8 +61,33 @@ services:
       - backend
     restart: unless-stopped
 
+  fhir-server:
+    image: intersystemsdc/irishealth-community:latest
+    container_name: medichub_fhir
+    restart: unless-stopped
+    ports:
+      - "32782:1972"
+      - "32783:52773"
+      - "32784:53773"
+    volumes:
+      - fhir_data:/usr/irissys/mgr
+      - ./iris-fhir-template-master/data/fhir:/data/fhir
+      - ./iris-fhir-template-master/src:/irisdev/app/src
+      - ./iris-fhir-template-master/iris.script:/irisdev/app/iris.script
+      - ./iris-fhir-template-master/module.xml:/irisdev/app/module.xml
+    environment:
+      - IRIS_PASSWORD=SYS
+      - IRIS_USERNAME=SuperUser
+    networks:
+      - app-network
+      - korex_space_korex_network
+    command: 
+      - --check-caps false
+
 volumes:
   postgres_data:
+  fhir_data:
+  redis_data:
 
 networks:
   app-network:
