@@ -37,8 +37,12 @@ export default function PatientList({ patients = [], onPatientClick }) {
 
   const getStatusBadge = (status) => {
     const config = {
-      scheduled: { label: 'Naplánováno', color: 'bg-blue-100 text-blue-800' },
+      scheduled: { label: 'Naplánováno', color: 'bg-purple-100 text-purple-800' },
+      pending_approval: { label: 'Čeká na schválení', color: 'bg-orange-100 text-orange-800' },
+      in_progress: { label: 'Probíhá', color: 'bg-blue-100 text-blue-800' },
       in_operation: { label: 'V operaci', color: 'bg-green-100 text-green-800' },
+      completed: { label: 'Dokončeno', color: 'bg-green-100 text-green-800' },
+      urgent: { label: 'Urgentní', color: 'bg-red-100 text-red-800' },
       post_op: { label: 'Po operaci', color: 'bg-yellow-100 text-yellow-800' },
       discharged: { label: 'Propuštěn', color: 'bg-gray-100 text-gray-800' },
     };
@@ -89,6 +93,10 @@ export default function PatientList({ patients = [], onPatientClick }) {
           >
             <option value="all">Všechny stavy</option>
             <option value="scheduled">Naplánováno</option>
+            <option value="pending_approval">Čeká na schválení</option>
+            <option value="in_progress">Probíhá</option>
+            <option value="completed">Dokončeno</option>
+            <option value="urgent">Urgentní</option>
             <option value="in_operation">V operaci</option>
             <option value="post_op">Po operaci</option>
             <option value="discharged">Propuštěni</option>

@@ -365,16 +365,25 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
                           value={roomDetail.operations_today || 0}
                           color="blue"
                         />
-                        <StatCard
-                          label="Využití dnes"
-                          value={`${roomDetail.utilization_today || 0}%`}
-                          color="green"
-                        />
+                        {roomDetail.urgent_today > 0 && (
+                          <StatCard
+                            label="Urgentní dnes"
+                            value={roomDetail.urgent_today || 0}
+                            color="red"
+                          />
+                        )}
                         <StatCard
                           label="Operací tento týden"
                           value={roomDetail.operations_week || 0}
                           color="purple"
                         />
+                        {roomDetail.completed_this_week > 0 && (
+                          <StatCard
+                            label="Dokončeno (týden)"
+                            value={roomDetail.completed_this_week || 0}
+                            color="gray"
+                          />
+                        )}
                         <StatCard
                           label="Kapacita"
                           value={roomDetail.capacity || 'N/A'}

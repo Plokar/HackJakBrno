@@ -48,21 +48,32 @@ class OperatingRoomViewSet(viewsets.ModelViewSet):
         ).order_by('scheduled_start')[:5]
         
         # Statistiky pro dnešek
-        operations_today = room.operations.filter(
-            scheduled_start__date=today
-        ).count()
+        operations_today_list = room.operations.filter(scheduled_start__date=today)
+        operations_today = operations_today_list.count()
+        urgent_today = operations_today_list.filter(is_emergency=True).count()
         
-        # Vytížení dnes
-        total_hours_today = sum(
-            op.duration_hours or 0 
-            for op in room.operations.filter(scheduled_start__date=today)
-        )
-        utilization_today = (total_hours_today / 8 * 100) if total_hours_today else 0
+        # Průměrná délka operací dnes
+        operations_with_duration = [op for op in operations_today_list if op.duration_hours]
+        avg_duration_hours = sum(op.duration_hours for op in operations_with_duration) / len(operations_with_duration) if operations_with_duration else 0
         
         # Operace tento týden
         week_start = today - timedelta(days=today.weekday())
         operations_week = room.operations.filter(
             scheduled_start__date__gte=week_start
+        ).count()
+        
+        # Počet dokončených operací tento týden
+        completed_this_week = room.operations.filter(
+            scheduled_start__date__gte=week_start,
+            status='completed'
+        ).count()
+        
+        # Počet nadcházejících operací (příštích 7 dní)
+        week_end = today + timedelta(days=7)
+        upcoming_count = room.operations.filter(
+            scheduled_start__date__gte=today,
+            scheduled_start__date__lte=week_end,
+            status='scheduled'
         ).count()
         
         # Sestavení odpovědi
@@ -74,8 +85,11 @@ class OperatingRoomViewSet(viewsets.ModelViewSet):
             'capacity': room.capacity,
             'status': 'available',
             'operations_today': operations_today,
-            'utilization_today': round(utilization_today, 2),
+            'urgent_today': urgent_today,
+            'avg_duration_hours': round(avg_duration_hours, 1),
             'operations_week': operations_week,
+            'completed_this_week': completed_this_week,
+            'upcoming_count': upcoming_count,
         }
         
         # Přidat aktuální operaci
@@ -154,8 +168,8 @@ class OperatingRoomViewSet(viewsets.ModelViewSet):
             if op.duration_hours:
                 total_hours += op.duration_hours
         
-        # Předpokládáme 8 hodin/den dostupnosti
-        available_hours = days * 8
+        # Sály jsou otevřené 24 hodin denně (0-24h)
+        available_hours = days * 24
         utilization_percent = (total_hours / available_hours * 100) if available_hours > 0 else 0
         
         return Response({
@@ -655,14 +669,33 @@ class DashboardViewSet(viewsets.ViewSet):
                 status='scheduled'
             ).order_by('scheduled_start').first()
             
-            total_hours = sum(op.duration_hours or 0 for op in operations_today_room)
-            utilization = (total_hours / 8 * 100) if total_hours else 0
-            
             # Určit status místnosti
             if current_operation:
                 status = 'active'
             else:
                 status = 'available'
+            
+            # Počet urgentních operací dnes
+            urgent_today = operations_today_room.filter(is_emergency=True).count()
+            
+            # Průměrná délka operací dnes (v hodinách)
+            operations_with_duration = [op for op in operations_today_room if op.duration_hours]
+            avg_duration = sum(op.duration_hours for op in operations_with_duration) / len(operations_with_duration) if operations_with_duration else 0
+            
+            # Počet nadcházejících operací (příštích 7 dní)
+            week_end = today + timedelta(days=7)
+            upcoming_count = room.operations.filter(
+                scheduled_start__date__gte=today,
+                scheduled_start__date__lte=week_end,
+                status='scheduled'
+            ).count()
+            
+            # Počet dokončených operací tento týden
+            week_start = today - timedelta(days=today.weekday())
+            completed_this_week = room.operations.filter(
+                scheduled_start__date__gte=week_start,
+                status='completed'
+            ).count()
             
             room_data = {
                 'id': room.id,
@@ -670,8 +703,11 @@ class DashboardViewSet(viewsets.ViewSet):
                 'room_number': room.room_number,
                 'building': f'Patro {room.floor}',
                 'status': status,
-                'utilization': round(utilization, 2),
                 'scheduledToday': operations_today_room.count(),
+                'urgentToday': urgent_today,
+                'avgDurationHours': round(avg_duration, 1),
+                'upcomingCount': upcoming_count,
+                'completedThisWeek': completed_this_week,
             }
             
             # Přidat informace o aktuální operaci

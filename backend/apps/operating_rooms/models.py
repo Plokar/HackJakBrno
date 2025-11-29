@@ -345,9 +345,13 @@ class Operation(TimeStampedModel):
     
     @property
     def duration_hours(self):
-        """Délka operace v hodinách"""
+        """Délka operace v hodinách - použije skutečnou délku, pokud je k dispozici, jinak plánovanou"""
         if self.actual_start and self.actual_end:
             delta = self.actual_end - self.actual_start
+            return delta.total_seconds() / 3600
+        elif self.scheduled_start and self.scheduled_end:
+            # Pokud není skutečná délka, použij plánovanou
+            delta = self.scheduled_end - self.scheduled_start
             return delta.total_seconds() / 3600
         return 0
     

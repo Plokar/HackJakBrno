@@ -107,11 +107,22 @@ function PatientsPageContent() {
 
         {/* Patient Detail Modal */}
         {selectedPatient && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <PatientDetailModal
-              patient={selectedPatient}
-              onClose={() => setSelectedPatient(null)}
-            />
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4 py-4">
+              {/* Background overlay */}
+              <div 
+                className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"
+                onClick={() => setSelectedPatient(null)}
+              ></div>
+
+              {/* Modal panel */}
+              <div className="relative w-full max-w-4xl my-8 overflow-hidden text-left transition-all transform bg-white rounded-lg shadow-xl">
+                <PatientDetailModal
+                  patient={selectedPatient}
+                  onClose={() => setSelectedPatient(null)}
+                />
+              </div>
+            </div>
           </div>
         )}
       </div>
