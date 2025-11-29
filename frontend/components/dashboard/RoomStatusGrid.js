@@ -18,47 +18,57 @@ export default function RoomStatusGrid({ rooms = [], onRoomClick }) {
     available: {
       label: 'Volný',
       icon: CheckCircleIcon,
-      bgColor: 'bg-green-100',
-      borderColor: 'border-green-400',
-      textColor: 'text-green-800',
-      iconColor: 'text-green-600',
-      pulseColor: 'bg-green-400'
+      bgColor: 'bg-[#EAEAEA]',
+      borderColor: 'border-[#E00034]',
+      textColor: 'text-gray-800',
+      iconColor: 'text-gray-600',
+      pulseColor: 'bg-[#666666]',
+      badgeBgColor: 'bg-[#666666]',
+      badgeBorderColor: 'border-[#666666]'
     },
     active: {
       label: 'V provozu',
       icon: ClockIcon,
       bgColor: 'bg-[#fce7ed]',
-      borderColor: 'border-[#C21533]',
-      textColor: 'text-[#C21533]',
-      iconColor: 'text-[#C21533]',
-      pulseColor: 'bg-[#C21533]'
+      borderColor: 'border-[#E00034]',
+      textColor: 'text-gray-800',
+      iconColor: 'text-gray-600',
+      pulseColor: 'bg-[#E00034]',
+      badgeBgColor: 'bg-[#E00034]',
+      badgeBorderColor: 'border-[#E00034]'
     },
     maintenance: {
       label: 'Údržba',
       icon: WrenchScrewdriverIcon,
-      bgColor: 'bg-yellow-100',
-      borderColor: 'border-yellow-400',
-      textColor: 'text-yellow-800',
-      iconColor: 'text-yellow-600',
-      pulseColor: 'bg-yellow-400'
+      bgColor: 'bg-[#fce7ed]',
+      borderColor: 'border-[#E00034]',
+      textColor: 'text-gray-800',
+      iconColor: 'text-gray-600',
+      pulseColor: 'bg-yellow-400',
+      badgeBgColor: 'bg-yellow-600',
+      badgeBorderColor: 'border-yellow-600'
     },
     cleaning: {
       label: 'Úklid',
       icon: WrenchScrewdriverIcon,
-      bgColor: 'bg-purple-100',
-      borderColor: 'border-purple-400',
-      textColor: 'text-purple-800',
-      iconColor: 'text-purple-600',
-      pulseColor: 'bg-purple-400'
+      bgColor: 'bg-[#fce7ed]',
+      borderColor: 'border-[#E00034]',
+      textColor: 'text-gray-800',
+      iconColor: 'text-gray-600',
+      pulseColor: 'bg-purple-400',
+      badgeBgColor: 'bg-purple-600',
+      badgeBorderColor: 'border-purple-600'
     },
     unavailable: {
       label: 'Nedostupný',
       icon: XCircleIcon,
-      bgColor: 'bg-gray-100',
-      borderColor: 'border-gray-400',
+      bgColor: 'bg-[#fce7ed]',
+      borderColor: 'border-[#E00034]',
       textColor: 'text-gray-800',
       iconColor: 'text-gray-600',
-      pulseColor: 'bg-gray-400'
+      pulseColor: 'bg-gray-400',
+      badgeBgColor: 'bg-gray-600',
+      badgeBorderColor: 'border-gray-600'
     }
   };
 
@@ -133,10 +143,9 @@ export default function RoomStatusGrid({ rooms = [], onRoomClick }) {
               key={room.id}
               onClick={() => onRoomClick && onRoomClick(room)}
               className={classNames(
-                'relative border-2 rounded-lg p-4 cursor-pointer transition-all duration-200',
+                'relative rounded-lg p-4 cursor-pointer transition-all duration-200',
                 'hover:shadow-xl hover:scale-105',
-                config.bgColor,
-                config.borderColor
+                config.bgColor
               )}
             >
               {/* Pulse indicator for active rooms */}
@@ -166,9 +175,10 @@ export default function RoomStatusGrid({ rooms = [], onRoomClick }) {
 
               {/* Status Badge */}
               <div className={classNames(
-                'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mb-3',
-                config.textColor,
-                'bg-white bg-opacity-60'
+                'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mb-3 border-2',
+                'text-white',
+                config.badgeBgColor,
+                config.badgeBorderColor
               )}>
                 {config.label}
               </div>
@@ -232,13 +242,8 @@ export default function RoomStatusGrid({ rooms = [], onRoomClick }) {
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
-                    className={classNames(
-                      'h-2 rounded-full transition-all duration-500',
-                      room.utilization > 85 ? 'bg-green-500' :
-                      room.utilization > 60 ? 'bg-yellow-500' :
-                      'bg-red-500'
-                    )}
-                    style={{ width: `${room.utilization || 0}%` }}
+                    className="h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${room.utilization || 0}%`, backgroundColor: '#6D1F27' }}
                   ></div>
                 </div>
               </div>
@@ -257,18 +262,16 @@ export default function RoomStatusGrid({ rooms = [], onRoomClick }) {
 }
 
 function FilterButton({ label, count, active, onClick, color = 'gray' }) {
-  const colors = {
-    gray: active ? 'bg-[#C21533] text-white' : 'bg-gray-100 text-gray-700 hover:bg-[#f9cfe0]',
-    blue: active ? 'bg-[#C21533] text-white' : 'bg-[#fce7ed] text-[#C21533] hover:bg-[#f9cfe0]',
-    green: active ? 'bg-green-500 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200',
-  };
+  const buttonClass = active 
+    ? 'bg-[#E00034] text-white' 
+    : 'bg-gray-200 text-gray-700 hover:bg-gray-300';
 
   return (
     <button
       onClick={onClick}
       className={classNames(
         'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-        colors[color]
+        buttonClass
       )}
     >
       {label} {count !== undefined && `(${count})`}
