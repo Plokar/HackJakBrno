@@ -20,6 +20,92 @@ class OperatingRoomViewSet(viewsets.ModelViewSet):
     queryset = OperatingRoom.objects.all()
     serializer_class = OperatingRoomSerializer
     
+    @action(detail=True, methods=['get'], url_path='detail')
+    def room_detail(self, request, pk=None):
+        """Získat detailní informace o sále včetně aktuální operace"""
+        room = self.get_object()
+        today = timezone.now().date()
+        
+        # Aktuální operace
+        current_operation = room.operations.filter(status='in_progress').first()
+        
+        # Nadcházející operace
+        upcoming_operations = room.operations.filter(
+            scheduled_start__gte=timezone.now(),
+            status='scheduled'
+        ).order_by('scheduled_start')[:5]
+        
+        # Statistiky pro dnešek
+        operations_today = room.operations.filter(
+            scheduled_start__date=today
+        ).count()
+        
+        # Vytížení dnes
+        total_hours_today = sum(
+            op.duration_hours or 0 
+            for op in room.operations.filter(scheduled_start__date=today)
+        )
+        utilization_today = (total_hours_today / 8 * 100) if total_hours_today else 0
+        
+        # Operace tento týden
+        week_start = today - timedelta(days=today.weekday())
+        operations_week = room.operations.filter(
+            scheduled_start__date__gte=week_start
+        ).count()
+        
+        # Sestavení odpovědi
+        response_data = {
+            'id': room.id,
+            'name': room.name,
+            'room_number': room.room_number,
+            'building': f'Patro {room.floor}',
+            'capacity': room.capacity,
+            'status': 'available',
+            'operations_today': operations_today,
+            'utilization_today': round(utilization_today, 2),
+            'operations_week': operations_week,
+        }
+        
+        # Přidat aktuální operaci
+        if current_operation:
+            response_data['status'] = 'active'
+            assisting_doctors = [
+                f"Dr. {doc.first_name} {doc.last_name}"
+                for doc in current_operation.assisting_doctors.all()
+            ]
+            
+            response_data['currentOperation'] = {
+                'id': current_operation.id,
+                'type': current_operation.operation_type,
+                'patient': f"{current_operation.patient.first_name} {current_operation.patient.last_name}",
+                'patient_birth_number': current_operation.patient.birth_number,
+                'surgeon': f"Dr. {current_operation.primary_doctor.first_name} {current_operation.primary_doctor.last_name}",
+                'surgeon_specialization': current_operation.primary_doctor.specialization,
+                'assisting_doctors': assisting_doctors,
+                'startTime': current_operation.actual_start.isoformat() if current_operation.actual_start else current_operation.scheduled_start.isoformat(),
+                'estimatedEnd': current_operation.scheduled_end.isoformat() if current_operation.scheduled_end else None,
+                'is_emergency': current_operation.is_emergency,
+                'notes': current_operation.notes or '',
+            }
+        
+        # Přidat nadcházející operace
+        if upcoming_operations.exists():
+            response_data['upcoming_operations'] = [
+                {
+                    'id': op.id,
+                    'type': op.operation_type,
+                    'patient': f"{op.patient.first_name} {op.patient.last_name}",
+                    'surgeon': f"Dr. {op.primary_doctor.first_name} {op.primary_doctor.last_name}",
+                    'scheduledTime': op.scheduled_start.isoformat(),
+                    'estimated_duration': op.duration_hours,
+                }
+                for op in upcoming_operations
+            ]
+        else:
+            response_data['upcoming_operations'] = []
+        
+        return Response(response_data)
+    
     @action(detail=True, methods=['get'])
     def schedule(self, request, pk=None):
         """Získat rozpis operací pro daný sál"""

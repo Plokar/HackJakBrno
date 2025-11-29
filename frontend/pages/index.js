@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import RealTimeDashboard from '../components/dashboard/RealTimeDashboard';
+import RoomDetailModal from '../components/dashboard/RoomDetailModal';
 
 export default function Home() {
   const [roomsData, setRoomsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedRoomId, setSelectedRoomId] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -43,7 +46,13 @@ export default function Home() {
 
   const handleRoomClick = (room) => {
     console.log('Room clicked:', room);
-    // TODO: Open room detail modal
+    setSelectedRoomId(room.id);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedRoomId(null);
   };
 
   if (loading) {
@@ -85,6 +94,12 @@ export default function Home() {
       <RealTimeDashboard 
         data={roomsData} 
         onRoomClick={handleRoomClick}
+      />
+
+      <RoomDetailModal 
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        roomId={selectedRoomId}
       />
     </>
   );

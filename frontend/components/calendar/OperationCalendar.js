@@ -363,8 +363,8 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
           selectMirror={true}
           dayMaxEvents={true}
           weekends={true}
-          slotMinTime="06:00:00"
-          slotMaxTime="22:00:00"
+          slotMinTime="00:00:00"
+          slotMaxTime="24:00:00"
           slotDuration="00:30:00"
           height="auto"
           eventContent={renderEventContent}
