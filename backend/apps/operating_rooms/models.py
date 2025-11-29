@@ -204,3 +204,43 @@ class MaterialUsage(TimeStampedModel):
     
     def __str__(self):
         return f"{self.material} - {self.quantity_used} {self.material.unit}"
+
+
+class OperationTool(TimeStampedModel):
+    """Model pro operační nástroje a pomůcky s životností"""
+    STATUS_CHOICES = [
+        ('good', 'Dobrý stav'),
+        ('warning', 'Varování'),
+        ('critical', 'Kritický'),
+    ]
+    
+    UNIT_CHOICES = [
+        ('použití', 'Použití'),
+        ('dní', 'Dní'),
+        ('hodin', 'Hodin'),
+    ]
+    
+    name = models.CharField(max_length=200, help_text="Název nástroje nebo materiálu")
+    category = models.CharField(max_length=100, help_text="Kategorie (např. Všeobecná Chirurgie, Ortopedie/Trauma)")
+    inventory_code = models.CharField(max_length=50, unique=True, blank=True, null=True, help_text="Fiktivní inventární kód")
+    sterilization_cost = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Cena sterilizace v Kč na použití")
+    udi_code = models.CharField(max_length=200, blank=True, null=True, help_text="UDI DataMatrix kód (GS1 formát)")
+    quantity = models.IntegerField(default=0, help_text="Aktuální množství na skladě")
+    lifespan = models.IntegerField(blank=True, null=True, help_text="Životnost nástroje")
+    unit = models.CharField(max_length=20, choices=UNIT_CHOICES, default='použití', help_text="Jednotka životnosti")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='good', help_text="Stav zásob")
+    description = models.TextField(blank=True, help_text="Dodatečný popis")
+    
+    class Meta:
+        db_table = 'operation_tools'
+        ordering = ['category', 'name']
+        verbose_name = 'Operační nástroj'
+        verbose_name_plural = 'Operační nástroje'
+    
+    def __str__(self):
+        return f"{self.name} ({self.inventory_code or 'N/A'})"
+    
+    @property
+    def is_low_stock(self):
+        """Zkontroluje, zda je zásoba nízká"""
+        return self.quantity < 10

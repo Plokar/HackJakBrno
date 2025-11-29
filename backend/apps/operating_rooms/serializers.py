@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from .models import (
     OperatingRoom, Patient, Doctor, Equipment, Material,
-    Operation, PerioperativeProtocol, EquipmentUsage, MaterialUsage
+    Operation, PerioperativeProtocol, EquipmentUsage, MaterialUsage,
+    OperationTool
 )
 
 
@@ -187,3 +188,12 @@ class DashboardStatsSerializer(serializers.Serializer):
     total_patients = serializers.IntegerField()
     room_utilization = serializers.ListField()
     upcoming_operations = OperationListSerializer(many=True)
+
+
+class OperationToolSerializer(serializers.ModelSerializer):
+    """Serializer pro operační nástroje"""
+    is_low_stock = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = OperationTool
+        fields = '__all__'
