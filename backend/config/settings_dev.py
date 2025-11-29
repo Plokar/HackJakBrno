@@ -24,6 +24,11 @@ INTERNAL_IPS = [
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
+# CSRF pro development - vypnout pro API endpointy
+CSRF_TRUSTED_ORIGINS = ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:8000']
+CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_SAMESITE = None
+
 # Logging
 LOGGING = {
     'version': 1,

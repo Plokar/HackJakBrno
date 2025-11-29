@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -6,11 +6,26 @@ import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
 import csLocale from '@fullcalendar/core/locales/cs';
 
-export default function OperationCalendar({ operations = [], rooms = [], onEventClick, onDateSelect }) {
+export default function OperationCalendar({ operations = [], rooms = [], onEventClick, onDateSelect, onAddOperation }) {
+  const calendarRef = useRef(null);
   const [view, setView] = useState('timeGridWeek');
+  const [selectedRoom, setSelectedRoom] = useState(null);
+
+  const handleViewChange = (newView) => {
+    setView(newView);
+    if (calendarRef.current) {
+      const calendarApi = calendarRef.current.getApi();
+      calendarApi.changeView(newView);
+    }
+  };
+
+  // Filter operations by selected room
+  const filteredOperations = selectedRoom 
+    ? operations.filter(op => op.room?.id === selectedRoom)
+    : operations;
 
   // Transform operations data for FullCalendar
-  const events = operations.map(op => ({
+  const events = filteredOperations.map(op => ({
     id: op.id,
     title: `${op.type} - ${op.patient?.name || 'Pacient'}`,
     start: op.scheduledStart,
@@ -81,13 +96,46 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Harmonogram operací</h2>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div className="flex items-center gap-4 flex-1">
+          <h2 className="text-2xl font-bold text-gray-900">Harmonogram operací</h2>
+          
+          {/* Room Selector */}
+          <div className="flex items-center gap-2">
+            <label htmlFor="room-select" className="text-sm font-medium text-gray-700">
+              Sál:
+            </label>
+            <select
+              id="room-select"
+              value={selectedRoom || ''}
+              onChange={(e) => setSelectedRoom(e.target.value ? parseInt(e.target.value) : null)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">Všechny sály</option>
+              {rooms.map(room => (
+                <option key={room.id} value={room.id}>
+                  {room.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Add Operation Button */}
+          <button
+            onClick={() => onAddOperation && onAddOperation()}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Přidat operaci
+          </button>
+        </div>
         
         {/* View Selector */}
         <div className="flex space-x-2">
           <button
-            onClick={() => setView('timeGridDay')}
+            onClick={() => handleViewChange('timeGridDay')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               view === 'timeGridDay'
                 ? 'bg-blue-600 text-white'
@@ -97,7 +145,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
             Den
           </button>
           <button
-            onClick={() => setView('timeGridWeek')}
+            onClick={() => handleViewChange('timeGridWeek')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               view === 'timeGridWeek'
                 ? 'bg-blue-600 text-white'
@@ -107,7 +155,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
             Týden
           </button>
           <button
-            onClick={() => setView('dayGridMonth')}
+            onClick={() => handleViewChange('dayGridMonth')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               view === 'dayGridMonth'
                 ? 'bg-blue-600 text-white'
@@ -117,7 +165,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
             Měsíc
           </button>
           <button
-            onClick={() => setView('listWeek')}
+            onClick={() => handleViewChange('listWeek')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               view === 'listWeek'
                 ? 'bg-blue-600 text-white'
@@ -142,6 +190,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
       {/* Calendar */}
       <div className="calendar-container">
         <FullCalendar
+          ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
           initialView={view}
           headerToolbar={{
@@ -176,22 +225,22 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
       <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t border-gray-200">
         <StatCard
           label="Celkem operací"
-          value={operations.length}
+          value={filteredOperations.length}
           color="blue"
         />
         <StatCard
           label="Probíhající"
-          value={operations.filter(op => op.status === 'in_progress').length}
+          value={filteredOperations.filter(op => op.status === 'in_progress').length}
           color="blue"
         />
         <StatCard
           label="Naplánováno"
-          value={operations.filter(op => op.status === 'scheduled').length}
+          value={filteredOperations.filter(op => op.status === 'scheduled').length}
           color="purple"
         />
         <StatCard
           label="Dokončeno"
-          value={operations.filter(op => op.status === 'completed').length}
+          value={filteredOperations.filter(op => op.status === 'completed').length}
           color="green"
         />
       </div>
