@@ -165,18 +165,64 @@ class Command(BaseCommand):
         # Vytvořit operace
         self.stdout.write('Vytvářím operace...')
         operations = []
-        statuses = ['scheduled', 'in_progress', 'completed', 'scheduled']
+        statuses = ['scheduled', 'scheduled', 'scheduled', 'completed']
         
-        # Operace pro dnes a budoucnost
-        for i in range(30):
-            days_offset = i // 3
-            start_hour = 8 + (i % 3) * 4
-            
-            scheduled_start = timezone.now() + timedelta(days=days_offset, hours=start_hour - timezone.now().hour)
-            duration = random.randint(2, 6)
+        # Nejdřív vytvořit několik běžících operací pro dnes
+        now = timezone.now()
+        today_start = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        
+        # 3-5 aktuálně běžících operací
+        num_in_progress = random.randint(3, 5)
+        for i in range(num_in_progress):
+            # Operace začala před 1-3 hodinami
+            hours_ago = random.randint(1, 3)
+            scheduled_start = now - timedelta(hours=hours_ago)
+            duration = random.randint(3, 5)
             scheduled_end = scheduled_start + timedelta(hours=duration)
             
-            status = random.choice(statuses) if days_offset == 0 else 'scheduled'
+            operation = Operation.objects.create(
+                patient=random.choice(patients),
+                operating_room=rooms[i],  # Každá v jiném sále
+                primary_doctor=random.choice(doctors),
+                operation_type=random.choice([
+                    'Laparoskopická cholecystektomie',
+                    'Artroskopie kolenního kloubu',
+                    'Appendektomie',
+                    'Herniotomie',
+                    'Kardiochirurgický výkon',
+                    'Spondylodéza',
+                    'Nefrolitotomie',
+                    'Tonzilektomie',
+                    'Plastická rekonstrukce',
+                    'Onkochirurgický výkon'
+                ]),
+                scheduled_start=scheduled_start,
+                scheduled_end=scheduled_end,
+                actual_start=scheduled_start,
+                status='in_progress',
+                is_emergency=random.random() < 0.1,
+                notes='Operace probíhá'
+            )
+            
+            # Přidat asistující doktory
+            assisting = random.sample([d for d in doctors if d != operation.primary_doctor], k=random.randint(1, 2))
+            operation.assisting_doctors.set(assisting)
+            operations.append(operation)
+        
+        # Pak vytvořit plánované operace pro dnes a budoucnost
+        for i in range(25):
+            days_offset = i // 5
+            hour_offset = (i % 5) * 2 + 10  # 10, 12, 14, 16, 18
+            
+            scheduled_start = today_start + timedelta(days=days_offset, hours=hour_offset - 8)
+            duration = random.randint(2, 4)
+            scheduled_end = scheduled_start + timedelta(hours=duration)
+            
+            # Pouze plánované nebo dokončené
+            if days_offset == 0 and scheduled_start < now:
+                status = 'completed'
+            else:
+                status = random.choice(statuses)
             
             operation = Operation.objects.create(
                 patient=random.choice(patients),
@@ -206,9 +252,6 @@ class Command(BaseCommand):
                 operation.actual_start = operation.scheduled_start
                 operation.actual_end = operation.scheduled_end + timedelta(minutes=random.randint(-30, 30))
                 operation.save()
-            elif status == 'in_progress':
-                operation.actual_start = operation.scheduled_start
-                operation.save()
             
             # Přidat asistující doktory
             assisting = random.sample([d for d in doctors if d != operation.primary_doctor], k=random.randint(1, 2))
@@ -216,7 +259,7 @@ class Command(BaseCommand):
             
             operations.append(operation)
         
-        self.stdout.write(self.style.SUCCESS(f'Vytvořeno {len(operations)} operací'))
+        self.stdout.write(self.style.SUCCESS(f'Vytvořeno {len(operations)} operací (včetně {num_in_progress} běžících)'))
         
         # Vytvořit peroperační protokoly pro dokončené operace
         self.stdout.write('Vytvářím peroperační protokoly...')

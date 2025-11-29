@@ -16,7 +16,7 @@ export default function Home() {
 
   const fetchDashboardData = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/operating-rooms/dashboard/`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/medic/dashboard/stats/`, {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -28,7 +28,7 @@ export default function Home() {
       }
 
       const data = await response.json();
-      setRoomsData(data.rooms || []);
+      setRoomsData(data.room_utilization || []);
       setError(null);
       setLoading(false);
     } catch (err) {

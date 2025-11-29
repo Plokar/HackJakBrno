@@ -74,6 +74,20 @@ class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
     
+    @action(detail=False, methods=['get'])
+    def search_by_birth_number(self, request):
+        """Vyhledání pacienta podle rodného čísla"""
+        birth_number = request.query_params.get('birth_number', None)
+        if not birth_number:
+            return Response({'error': 'Zadejte rodné číslo'}, status=400)
+        
+        try:
+            patient = Patient.objects.get(birth_number=birth_number)
+            serializer = PatientSerializer(patient)
+            return Response(serializer.data)
+        except Patient.DoesNotExist:
+            return Response({'error': 'Pacient nenalezen'}, status=404)
+    
     @action(detail=True, methods=['get'])
     def operations(self, request, pk=None):
         """Historie operací pacienta"""
@@ -157,7 +171,7 @@ class MaterialViewSet(viewsets.ModelViewSet):
 
 
 class OperationViewSet(viewsets.ModelViewSet):
-    queryset = Operation.objects.all()
+    queryset = Operation.objects.all().order_by('-created_at')  # Nejnovější operace první
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -291,26 +305,64 @@ class DashboardViewSet(viewsets.ViewSet):
         ).count()
         total_patients = Patient.objects.count()
         
-        # Vytížení sálů
+        # Vytížení sálů s detailními informacemi pro frontend
         rooms = OperatingRoom.objects.filter(is_active=True)
         room_utilization = []
         
         for room in rooms:
-            operations = room.operations.filter(
+            # Operace pro dnešek
+            operations_today_room = room.operations.filter(
                 scheduled_start__date=today
             )
-            total_hours = sum(op.duration_hours or 0 for op in operations)
+            
+            # Aktuální běžící operace
+            current_operation = room.operations.filter(status='in_progress').first()
+            
+            # Nadcházející operace
+            next_operation = room.operations.filter(
+                scheduled_start__gte=timezone.now(),
+                status='scheduled'
+            ).order_by('scheduled_start').first()
+            
+            total_hours = sum(op.duration_hours or 0 for op in operations_today_room)
             utilization = (total_hours / 8 * 100) if total_hours else 0
             
-            room_utilization.append({
-                'room_id': room.id,
-                'room_name': room.name,
+            # Určit status místnosti
+            if current_operation:
+                status = 'active'
+            else:
+                status = 'available'
+            
+            room_data = {
+                'id': room.id,
+                'name': room.name,
                 'room_number': room.room_number,
-                'operations_count': operations.count(),
-                'total_hours': round(total_hours, 2),
-                'utilization_percent': round(utilization, 2),
-                'status': 'in_use' if operations.filter(status='in_progress').exists() else 'available'
-            })
+                'building': f'Patro {room.floor}',
+                'status': status,
+                'utilization': round(utilization, 2),
+                'scheduledToday': operations_today_room.count(),
+            }
+            
+            # Přidat informace o aktuální operaci
+            if current_operation:
+                room_data['currentOperation'] = {
+                    'id': current_operation.id,
+                    'type': current_operation.operation_type,
+                    'startTime': current_operation.scheduled_start.isoformat() if current_operation.scheduled_start else None,
+                    'estimatedEnd': current_operation.scheduled_end.isoformat() if current_operation.scheduled_end else None,
+                    'surgeon': f"Dr. {current_operation.primary_doctor.first_name} {current_operation.primary_doctor.last_name}" if current_operation.primary_doctor else 'N/A',
+                    'patient': f"{current_operation.patient.first_name} {current_operation.patient.last_name}" if current_operation.patient else 'N/A',
+                }
+            
+            # Přidat informace o nadcházející operaci
+            if next_operation and not current_operation:
+                room_data['nextOperation'] = {
+                    'id': next_operation.id,
+                    'scheduledTime': next_operation.scheduled_start.isoformat() if next_operation.scheduled_start else None,
+                    'type': next_operation.operation_type,
+                }
+            
+            room_utilization.append(room_data)
         
         # Nadcházející operace
         upcoming_operations = Operation.objects.filter(

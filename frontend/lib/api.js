@@ -154,6 +154,7 @@ class ApiClient {
     update: (id, data) => this.put(`/api/medic/patients/${id}/`, data),
     delete: (id) => this.delete(`/api/medic/patients/${id}/`),
     getOperations: (id) => this.get(`/api/medic/patients/${id}/operations/`),
+    searchByBirthNumber: (birthNumber) => this.get('/api/medic/patients/search_by_birth_number/', { birth_number: birthNumber }),
   };
 
   /**
