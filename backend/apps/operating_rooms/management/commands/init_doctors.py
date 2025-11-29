@@ -20,6 +20,16 @@ class Command(BaseCommand):
         )
     
     def handle(self, *args, **options):
+        # KONTROLA: Pokud uz existuji doktori v Django, preskocit generovani
+        django_doctors_count = Doctor.objects.count()
+        if django_doctors_count > 0 and not options['force']:
+            self.stdout.write(self.style.WARNING(
+                f'V databazi uz existuje {django_doctors_count} doktoru. '
+                f'Preskakuji inicializaci. Pouzijte --force pro vytvoreni novych.'
+            ))
+            self.print_statistics()
+            return
+        
         self.fhir_service = FHIRService()
         
         # Test pripojeni k FHIR serveru
@@ -46,7 +56,11 @@ class Command(BaseCommand):
                 self.sync_existing_doctors()
                 return
             
-            # Vytvorit defaultni doktory
+            # Vytvorit defaultni doktory POUZE pokud neni force a nejsou importovana data
+            self.stdout.write(self.style.WARNING(
+                'POZOR: Vytvarim defaultni demo doktory. '
+                'Pro pouziti realnych dat spuste: python manage.py import_excel_data --sync-fhir'
+            ))
             self.stdout.write('Vytvarim defaultni doktory...')
             self.create_default_doctors()
             

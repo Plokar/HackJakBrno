@@ -535,8 +535,8 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
           events={events}
           eventClick={handleEventClick}
           select={handleDateSelect}
-          selectable={currentRole !== 'admin'}
-          selectMirror={currentRole !== 'admin'}
+          selectable={currentRole === 'doctor'}
+          selectMirror={currentRole === 'doctor'}
           dayMaxEvents={true}
           weekends={true}
           slotMinTime="00:00:00"

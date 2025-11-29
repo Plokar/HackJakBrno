@@ -7,7 +7,6 @@ import {
   CalendarIcon, 
   UserGroupIcon,
   DocumentChartBarIcon,
-  CogIcon,
   BellIcon,
   UserCircleIcon,
   Bars3Icon,
@@ -22,11 +21,61 @@ export default function Layout({ children, currentUser }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [hasMounted, setHasMounted] = useState(false);
+  const [dashboardStats, setDashboardStats] = useState({
+    activeOperations: 0,
+    availableRooms: 0,
+    utilization: 0
+  });
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     setHasMounted(true);
     return () => clearInterval(timer);
+  }, []);
+
+  // Fetch dashboard stats
+  useEffect(() => {
+    const fetchDashboardStats = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+        const url = apiUrl.startsWith('/api/proxy') 
+          ? '/api/proxy/medic/dashboard/stats/'
+          : `${apiUrl}/medic/dashboard/stats/`;
+        
+        const response = await fetch(url, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const rooms = data.room_utilization || [];
+          
+          // Calculate stats
+          const activeOperations = rooms.filter(room => room.status === 'active').length;
+          const availableRooms = rooms.filter(room => room.status === 'available').length;
+          // Utilization based on how many rooms are not free (not available)
+          const totalRooms = rooms.length;
+          const notFreeRooms = totalRooms - availableRooms;
+          const utilization = totalRooms > 0 ? Math.round((notFreeRooms / totalRooms) * 100) : 0;
+          
+          setDashboardStats({
+            activeOperations,
+            availableRooms,
+            utilization
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching dashboard stats:', err);
+      }
+    };
+
+    fetchDashboardStats();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchDashboardStats, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const formatTime = (date) => {
@@ -64,7 +113,6 @@ export default function Layout({ children, currentUser }) {
     { name: 'Pacienti', href: '/patients', icon: UserGroupIcon, current: router.pathname === '/patients' },
     { name: 'Personál', href: '/staff', icon: UserCircleIcon, current: router.pathname === '/staff' },
     { name: 'Reporty', href: '/reports', icon: DocumentChartBarIcon, current: router.pathname === '/reports' },
-    { name: 'Nastavení', href: '/settings', icon: CogIcon, current: router.pathname === '/settings' },
   ];
 
   return (
@@ -186,9 +234,9 @@ export default function Layout({ children, currentUser }) {
 
             {/* Quick Stats */}
             <div className="hidden md:flex items-center space-x-6">
-              <QuickStat label="Aktivní operace" value="3" color="blue" />
-              <QuickStat label="Volné sály" value="7" color="green" />
-              <QuickStat label="Využití" value="65%" color="yellow" />
+              <QuickStat label="Aktivní operace" value={dashboardStats.activeOperations.toString()} color="blue" />
+              <QuickStat label="Volné sály" value={dashboardStats.availableRooms.toString()} color="green" />
+              <QuickStat label="Využití" value={`${dashboardStats.utilization}%`} color="yellow" />
             </div>
 
             {/* Right Actions */}
