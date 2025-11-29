@@ -552,22 +552,22 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
         <StatCard
           label="Celkem operací"
           value={filteredOperations.length}
-          color="custom-red-1"
+          color="blue"
         />
         <StatCard
           label="Probíhající"
           value={filteredOperations.filter(op => op.status === 'in_progress').length}
-          color="custom-red-2"
+          color="green"
         />
         <StatCard
           label="Naplánováno"
           value={filteredOperations.filter(op => op.status === 'scheduled').length}
-          color="custom-red-3"
+          color="purple"
         />
         <StatCard
           label="Dokončeno"
           value={filteredOperations.filter(op => op.status === 'completed').length}
-          color="custom-red-4"
+          color="gray"
         />
       </div>
 
@@ -680,6 +680,7 @@ function StatCard({ label, value, color }) {
     green: 'bg-green-50 text-green-700',
     purple: 'bg-purple-50 text-purple-700',
     red: 'bg-red-50 text-red-700',
+    gray: 'bg-gray-50 text-gray-700',
     // Custom colors - lighter shades
     'custom-red-1': 'bg-[#E00034]/20 text-black',
     'custom-red-2': 'bg-[#E00034]/20 text-black',
