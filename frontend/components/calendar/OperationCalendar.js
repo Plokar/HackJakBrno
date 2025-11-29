@@ -6,7 +6,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
 import csLocale from '@fullcalendar/core/locales/cs';
 
-export default function OperationCalendar({ operations = [], rooms = [], onEventClick, onDateSelect, onAddOperation, currentRole = 'doctor' }) {
+export default function OperationCalendar({ operations = [], rooms = [], onEventClick, onDateSelect, onAddOperation, currentRole = 'doctor', highlightedOperationId = null }) {
   const DEFAULT_COLUMN_WIDTH = 150;
   const MAX_COLUMN_WIDTH = 260;
   // výchozí šířka pro měsíční zobrazení (nastaveno na 165px)
@@ -32,8 +32,25 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     roomsCount: rooms.length,
     view,
     columnCount,
-    selectedRoom 
+    selectedRoom,
+    highlightedOperationId 
   });
+
+  // Automaticky navigovat na datum zvýrazněné operace
+  useEffect(() => {
+    if (highlightedOperationId && calendarRef.current) {
+      const highlightedOp = operations.find(op => op.id === highlightedOperationId);
+      if (highlightedOp && highlightedOp.scheduledStart) {
+        const calendarApi = calendarRef.current.getApi();
+        calendarApi.gotoDate(new Date(highlightedOp.scheduledStart));
+        
+        // Automaticky vybrat sál operace
+        if (highlightedOp.room?.id) {
+          setSelectedRoom(highlightedOp.room.id);
+        }
+      }
+    }
+  }, [highlightedOperationId, operations]);
 
   const handleViewChange = (newView) => {
     setView(newView);
@@ -268,22 +285,36 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
   }, []);
 
   // Transform operations data for FullCalendar
-  const events = filteredOperations.map(op => ({
-    id: op.id,
-    title: `${op.type} - ${op.patient?.name || 'Pacient'}`,
-    start: op.scheduledStart,
-    end: op.scheduledEnd,
-    backgroundColor: getEventColor(op.status, op.priority),
-    borderColor: getEventBorderColor(op.status),
-    extendedProps: {
-      room: op.room,
-      surgeon: op.surgeon,
-      patient: op.patient,
-      status: op.status,
-      priority: op.priority,
-      estimatedCost: op.estimatedCost
+  const events = filteredOperations.map(op => {
+    const isHighlighted = highlightedOperationId && op.id === highlightedOperationId;
+    const isPast = new Date(op.scheduledEnd) < new Date();
+    
+    // Pokud je operace v minulosti a není označená jako completed, označit ji vizuálně
+    let className = isHighlighted ? 'highlighted-operation' : '';
+    if (isPast && op.status !== 'completed' && op.status !== 'cancelled') {
+      className += ' past-operation';
     }
-  }));
+    
+    return {
+      id: op.id,
+      title: `${op.type} - ${op.patient?.name || 'Pacient'}`,
+      start: op.scheduledStart,
+      end: op.scheduledEnd,
+      backgroundColor: isHighlighted ? '#C21533' : getEventColor(op.status, op.priority),
+      borderColor: isHighlighted ? '#8f0f26' : getEventBorderColor(op.status),
+      className: className.trim(),
+      extendedProps: {
+        room: op.room,
+        surgeon: op.surgeon,
+        patient: op.patient,
+        status: op.status,
+        priority: op.priority,
+        estimatedCost: op.estimatedCost,
+        isHighlighted: isHighlighted,
+        isPast: isPast
+      }
+    };
+  });
 
   function getEventColor(status, priority) {
     // Priorita statusů pro barvy
@@ -341,11 +372,25 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
 
   const renderEventContent = (eventInfo) => {
     const roomName = eventInfo.event.extendedProps.room?.name || '';
+    const isHighlighted = eventInfo.event.extendedProps.isHighlighted;
+    const isPast = eventInfo.event.extendedProps.isPast;
+    const status = eventInfo.event.extendedProps.status;
+    
+    // Status emoji
+    let statusEmoji = '';
+    if (status === 'completed') statusEmoji = '✅';
+    else if (status === 'in_progress') statusEmoji = '⏱️';
+    else if (status === 'cancelled') statusEmoji = '❌';
+    else if (isPast && status !== 'completed') statusEmoji = '⚠️';
+    
     return (
-      <div className="p-1 leading-snug space-y-0.5 text-gray-900 text-[15px]">
-        <div className="font-semibold text-[15px] truncate">{eventInfo.timeText}</div>
+      <div className={`p-1 leading-snug space-y-0.5 text-[15px] ${isHighlighted ? 'text-white animate-pulse' : 'text-gray-900'} ${isPast && status !== 'completed' ? 'opacity-60' : ''}`}>
+        <div className="font-semibold text-[15px] truncate">
+          {eventInfo.timeText} {statusEmoji}
+        </div>
         <div className="font-semibold whitespace-normal break-words" style={clampStyle(2)}>
           {eventInfo.event.title}
+          {isHighlighted && ' 📍'}
         </div>
         {roomName && (
           <div className="text-[14px] opacity-80 whitespace-normal break-words" style={clampStyle(2)}>
@@ -449,15 +494,29 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
 
       {/* Legend */}
       <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-        <LegendItem color="#fb923c" label="Čeká na schválení" />
-        <LegendItem color="#fbbf24" label="Čeká na personál" />
-        <LegendItem color="#8b5cf6" label="Naplánováno" />
-        <LegendItem color="#3b82f6" label="Probíhá" />
-        <LegendItem color="#10b981" label="Dokončeno" />
-        <LegendItem color="#6b7280" label="Zrušeno" />
+        <div className="w-full mb-2">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Status operací:</h3>
+          <div className="flex flex-wrap gap-4">
+            <LegendItem color="#fb923c" label="Čeká na schválení" />
+            <LegendItem color="#fbbf24" label="Čeká na personál" />
+            <LegendItem color="#8b5cf6" label="Naplánováno" />
+            <LegendItem color="#3b82f6" label="⏱️ Probíhá" />
+            <LegendItem color="#10b981" label="✅ Dokončeno" />
+            <LegendItem color="#6b7280" label="❌ Zrušeno" />
+          </div>
+        </div>
         <div className="w-full border-t border-gray-300 my-1"></div>
-        <LegendItem color="#dc2626" label="Urgentní" />
-        <LegendItem color="#f59e0b" label="Vysoká priorita" />
+        <div className="w-full">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Priorita:</h3>
+          <div className="flex flex-wrap gap-4">
+            <LegendItem color="#dc2626" label="Urgentní" />
+            <LegendItem color="#f59e0b" label="Vysoká priorita" />
+          </div>
+        </div>
+        <div className="w-full border-t border-gray-300 my-1"></div>
+        <div className="text-xs text-gray-600">
+          ⚠️ Operace v minulosti (neukončené) jsou zobrazeny šedě
+        </div>
       </div>
 
       {/* Calendar */}

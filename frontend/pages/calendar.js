@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import OperationCalendar from '../components/calendar/OperationCalendar';
 import AddOperationModal from '../components/calendar/AddOperationModal';
 import OperationDetailModal from '../components/calendar/OperationDetailModal';
@@ -7,6 +8,8 @@ import { api } from '../lib/api';
 import { useRole } from '../lib/RoleContext';
 
 export default function CalendarPage() {
+  const router = useRouter();
+  const { operationId, roomId, highlight } = router.query;
   const { currentRole, isDoctor, isAdmin, isNurse } = useRole();
   const [operations, setOperations] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -16,10 +19,23 @@ export default function CalendarPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState(null);
   const [selectedOperationId, setSelectedOperationId] = useState(null);
+  const [highlightedOperationId, setHighlightedOperationId] = useState(null);
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Zpracovat query parametry z dashboardu
+  useEffect(() => {
+    if (operationId && highlight === 'true') {
+      setHighlightedOperationId(parseInt(operationId));
+      // Automaticky otevřít detail po načtení dat
+      setTimeout(() => {
+        setSelectedOperationId(parseInt(operationId));
+        setIsDetailModalOpen(true);
+      }, 500);
+    }
+  }, [operationId, highlight]);
 
   const fetchData = async () => {
     try {
@@ -107,6 +123,12 @@ export default function CalendarPage() {
   const handleCloseDetailModal = () => {
     setIsDetailModalOpen(false);
     setSelectedOperationId(null);
+    setHighlightedOperationId(null);
+    
+    // Vyčistit query parametry z URL
+    if (router.query.operationId || router.query.highlight) {
+      router.push('/calendar', undefined, { shallow: true });
+    }
   };
 
   const handleSubmitOperation = async (formData) => {
@@ -177,6 +199,7 @@ export default function CalendarPage() {
         onDateSelect={handleDateSelect}
         onAddOperation={handleAddOperation}
         currentRole={currentRole}
+        highlightedOperationId={highlightedOperationId}
       />
 
       <AddOperationModal

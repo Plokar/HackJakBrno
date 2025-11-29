@@ -32,13 +32,18 @@ class OperatingRoomViewSet(viewsets.ModelViewSet):
         """Získat detailní informace o sále včetně aktuální operace"""
         room = self.get_object()
         today = timezone.now().date()
+        now = timezone.now()
         
-        # Aktuální operace
-        current_operation = room.operations.filter(status='in_progress').first()
+        # Aktuální operace (pouze ty, které opravdu probíhají TEĎKA)
+        current_operation = room.operations.filter(
+            status='in_progress',
+            scheduled_start__lte=now,
+            scheduled_end__gte=now
+        ).first()
         
         # Nadcházející operace
         upcoming_operations = room.operations.filter(
-            scheduled_start__gte=timezone.now(),
+            scheduled_start__gt=now,
             status='scheduled'
         ).order_by('scheduled_start')[:5]
         
@@ -470,6 +475,45 @@ class OperationViewSet(viewsets.ModelViewSet):
         operation.save()
         serializer = self.get_serializer(operation)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'], url_path='auto-update-statuses')
+    def auto_update_statuses(self, request):
+        """Automaticky aktualizovat statusy všech operací na základě času"""
+        now = timezone.now()
+        
+        # 1. Spustit operace, které měly začít
+        scheduled_to_start = Operation.objects.filter(
+            status='scheduled',
+            scheduled_start__lte=now,
+            scheduled_end__gte=now
+        )
+        started_count = 0
+        for op in scheduled_to_start:
+            op.status = 'in_progress'
+            if not op.actual_start:
+                op.actual_start = op.scheduled_start
+            op.save(update_fields=['status', 'actual_start'])
+            started_count += 1
+        
+        # 2. Ukončit operace, které měly skončit
+        operations_to_complete = Operation.objects.filter(
+            status='in_progress',
+            scheduled_end__lt=now
+        )
+        completed_count = 0
+        for op in operations_to_complete:
+            op.status = 'completed'
+            if not op.actual_end:
+                op.actual_end = op.scheduled_end
+            op.save(update_fields=['status', 'actual_end'])
+            completed_count += 1
+        
+        return Response({
+            'message': 'Statusy operací byly aktualizovány',
+            'started': started_count,
+            'completed': completed_count,
+            'timestamp': now.isoformat()
+        })
 
 
 class PerioperativeProtocolViewSet(viewsets.ModelViewSet):
@@ -536,10 +580,49 @@ class PerioperativeProtocolViewSet(viewsets.ModelViewSet):
 class DashboardViewSet(viewsets.ViewSet):
     """Dashboard API pro přehled statistik"""
     
+    def _auto_update_operation_statuses(self):
+        """Automaticky aktualizovat statusy operací na základě času"""
+        now = timezone.now()
+        
+        # 1. Automaticky spustit operace, které měly začít
+        scheduled_to_start = Operation.objects.filter(
+            status='scheduled',
+            scheduled_start__lte=now,
+            scheduled_end__gte=now
+        )
+        for op in scheduled_to_start:
+            op.status = 'in_progress'
+            if not op.actual_start:
+                op.actual_start = op.scheduled_start
+            op.save(update_fields=['status', 'actual_start'])
+            print(f"Auto-started operation {op.id}: {op.operation_type}")
+        
+        # 2. Automaticky ukončit operace, které měly skončit
+        operations_to_complete = Operation.objects.filter(
+            status='in_progress',
+            scheduled_end__lt=now
+        )
+        for op in operations_to_complete:
+            op.status = 'completed'
+            if not op.actual_end:
+                op.actual_end = op.scheduled_end
+            op.save(update_fields=['status', 'actual_end'])
+            print(f"Auto-completed operation {op.id}: {op.operation_type}")
+        
+        return {
+            'started': scheduled_to_start.count(),
+            'completed': operations_to_complete.count()
+        }
+    
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """Získat statistiky pro dashboard"""
+        # Automaticky aktualizovat statusy operací před zobrazením statistik
+        auto_update_result = self._auto_update_operation_statuses()
+        print(f"Auto-update: started={auto_update_result['started']}, completed={auto_update_result['completed']}")
+        
         today = timezone.now().date()
+        now = timezone.now()
         
         # Základní statistiky
         total_rooms = OperatingRoom.objects.filter(is_active=True).count()
@@ -559,12 +642,16 @@ class DashboardViewSet(viewsets.ViewSet):
                 scheduled_start__date=today
             )
             
-            # Aktuální běžící operace
-            current_operation = room.operations.filter(status='in_progress').first()
+            # Aktuální běžící operace (pouze ty, které opravdu probíhají TEĎKA)
+            current_operation = room.operations.filter(
+                status='in_progress',
+                scheduled_start__lte=now,
+                scheduled_end__gte=now
+            ).first()
             
             # Nadcházející operace
             next_operation = room.operations.filter(
-                scheduled_start__gte=timezone.now(),
+                scheduled_start__gt=now,
                 status='scheduled'
             ).order_by('scheduled_start').first()
             
@@ -610,7 +697,7 @@ class DashboardViewSet(viewsets.ViewSet):
         
         # Nadcházející operace
         upcoming_operations = Operation.objects.filter(
-            scheduled_start__gte=timezone.now(),
+            scheduled_start__gte=now,
             status='scheduled'
         ).order_by('scheduled_start')[:10]
         
