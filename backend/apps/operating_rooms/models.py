@@ -108,23 +108,32 @@ class Material(TimeStampedModel):
 class Operation(TimeStampedModel):
     """Model operace"""
     STATUS_CHOICES = [
-        ('scheduled', 'Naplánováno'),
+        ('draft', 'Návrh'),  # Vytvořeno doktorem
+        ('pending_approval', 'Čeká na schválení'),  # Čeká na schválení adminem
+        ('approved', 'Schváleno'),  # Schváleno adminem
+        ('scheduled', 'Naplánováno'),  # Přiřazen personál sestrou
         ('in_progress', 'Probíhá'),
         ('completed', 'Dokončeno'),
         ('cancelled', 'Zrušeno'),
     ]
     
     patient = models.ForeignKey(Patient, on_delete=models.PROTECT, related_name='operations')
-    operating_room = models.ForeignKey(OperatingRoom, on_delete=models.PROTECT, related_name='operations')
-    primary_doctor = models.ForeignKey(Doctor, on_delete=models.PROTECT, related_name='primary_operations')
+    operating_room = models.ForeignKey(OperatingRoom, on_delete=models.PROTECT, related_name='operations', null=True, blank=True)
+    primary_doctor = models.ForeignKey(Doctor, on_delete=models.PROTECT, related_name='primary_operations', null=True, blank=True)
     assisting_doctors = models.ManyToManyField(Doctor, related_name='assisted_operations', blank=True)
     
-    operation_type = models.CharField(max_length=200)
-    scheduled_start = models.DateTimeField()
-    scheduled_end = models.DateTimeField()
+    # Uživatel, který operaci vytvořil
+    created_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, related_name='created_operations')
+    # Uživatel, který operaci schválil
+    approved_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_operations')
+    approved_at = models.DateTimeField(null=True, blank=True)
+    
+    operation_type = models.CharField(max_length=200, blank=True)
+    scheduled_start = models.DateTimeField(null=True, blank=True)
+    scheduled_end = models.DateTimeField(null=True, blank=True)
     actual_start = models.DateTimeField(null=True, blank=True)
     actual_end = models.DateTimeField(null=True, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     
     notes = models.TextField(blank=True)
     is_emergency = models.BooleanField(default=False)

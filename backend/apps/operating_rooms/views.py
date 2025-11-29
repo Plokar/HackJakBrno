@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import IsAuthenticated
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from datetime import datetime, timedelta
@@ -17,7 +18,8 @@ from .serializers import (
     EquipmentSerializer, MaterialSerializer, OperationListSerializer,
     OperationDetailSerializer, OperationCreateSerializer, PerioperativeProtocolSerializer,
     DashboardStatsSerializer, EquipmentUsageSerializer, MaterialUsageSerializer,
-    OperationToolSerializer
+    OperationToolSerializer,
+    OperationApprovalSerializer, OperationStaffAssignmentSerializer
 )
 
 
@@ -263,6 +265,7 @@ class MaterialViewSet(viewsets.ModelViewSet):
 
 class OperationViewSet(viewsets.ModelViewSet):
     queryset = Operation.objects.all().order_by('-created_at')  # Nejnovější operace první
+    # permission_classes = [IsAuthenticated]  # Vypnuto pro demo - používáme MockAuthMiddleware
     
     def get_serializer_class(self):
         if self.action == 'create':
@@ -271,15 +274,165 @@ class OperationViewSet(viewsets.ModelViewSet):
             return OperationDetailSerializer
         return OperationListSerializer
     
+    def get_serializer_context(self):
+        """Přidat request do kontextu serializeru"""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+    
     def create(self, request, *args, **kwargs):
-        """Vytvoření nové operace včetně pacienta"""
+        """Vytvoření nové operace - pouze pro doktory"""
+        # Kontrola, že uživatel je doktor
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'doctor':
+            return Response(
+                {'error': 'Pouze doktoři mohou vytvářet operace'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
         operation = serializer.save()
         
         # Vrátit detailní serializér pro odpověď
         response_serializer = OperationDetailSerializer(operation)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+    
+    @action(detail=True, methods=['post'], url_path='submit-for-approval')
+    def submit_for_approval(self, request, pk=None):
+        """Odeslat operaci ke schválení - pouze doktor, který ji vytvořil"""
+        operation = self.get_object()
+        
+        # Kontrola oprávnění (pro DEMO: pokud je created_by NULL, povolit)
+        if operation.created_by and operation.created_by != request.user:
+            return Response(
+                {'error': 'Můžete odeslat ke schválení pouze své operace'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if operation.status != 'draft':
+            return Response(
+                {'error': 'Operaci lze odeslat ke schválení pouze ve stavu "Návrh"'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        operation.status = 'pending_approval'
+        operation.save()
+        
+        serializer = self.get_serializer(operation)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'], url_path='approve')
+    def approve_operation(self, request, pk=None):
+        """Schválit operaci - pouze admin"""
+        operation = self.get_object()
+        
+        # Kontrola, že uživatel je admin
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'admin':
+            return Response(
+                {'error': 'Pouze administrátoři mohou schvalovat operace'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if operation.status != 'pending_approval':
+            return Response(
+                {'error': 'Operaci lze schválit pouze ve stavu "Čeká na schválení"'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        print(f"DEBUG approve: request.data = {request.data}")
+        serializer = OperationApprovalSerializer(data=request.data)
+        if not serializer.is_valid():
+            print(f"DEBUG approve: serializer.errors = {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        if serializer.validated_data['approved']:
+            operation.status = 'approved'
+            # Pro DEMO: approved_by nastavit na None, protože MockUser není Django User
+            operation.approved_by = None
+            operation.approved_at = timezone.now()
+            if serializer.validated_data.get('notes'):
+                operation.notes = f"{operation.notes}\n\nPoznámka admina: {serializer.validated_data['notes']}"
+            operation.save()
+            response_serializer = OperationDetailSerializer(operation)
+            return Response(response_serializer.data)
+        else:
+            # Operace zamítnuta - smazat ji
+            operation.delete()
+            return Response(
+                {'message': 'Operace byla zamítnuta a smazána', 'reason': serializer.validated_data.get('notes', '')},
+                status=status.HTTP_200_OK
+            )
+    
+    @action(detail=True, methods=['post'], url_path='assign-staff')
+    def assign_staff(self, request, pk=None):
+        """Přiřadit personál k operaci - pouze sestra"""
+        operation = self.get_object()
+        
+        # Kontrola, že uživatel je sestra
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'nurse':
+            return Response(
+                {'error': 'Pouze sestry mohou přiřazovat personál'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if operation.status != 'approved':
+            return Response(
+                {'error': 'Personál lze přiřadit pouze ke schválené operaci'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = OperationStaffAssignmentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Přiřadit asistující doktory
+        if 'assisting_doctor_ids' in serializer.validated_data:
+            operation.assisting_doctors.set(serializer.validated_data['assisting_doctor_ids'])
+        
+        # Aktualizovat poznámky
+        if serializer.validated_data.get('notes'):
+            operation.notes = f"{operation.notes}\n\nPoznámka sestry: {serializer.validated_data['notes']}"
+        
+        # Změnit status na naplánováno
+        operation.status = 'scheduled'
+        operation.save()
+        
+        response_serializer = OperationDetailSerializer(operation)
+        return Response(response_serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def my_operations(self, request):
+        """Operace vytvořené přihlášeným uživatelem"""
+        operations = Operation.objects.filter(created_by=request.user)
+        serializer = self.get_serializer(operations, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], url_path='pending-approval')
+    def pending_approval(self, request):
+        """Operace čekající na schválení - pro adminy"""
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'admin':
+            return Response(
+                {'error': 'Pouze administrátoři mohou zobrazit operace čekající na schválení'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        operations = Operation.objects.filter(status='pending_approval')
+        serializer = self.get_serializer(operations, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], url_path='approved-operations')
+    def approved_operations(self, request):
+        """Schválené operace čekající na přiřazení personálu - pro sestry"""
+        if not hasattr(request.user, 'profile') or request.user.profile.role != 'nurse':
+            return Response(
+                {'error': 'Pouze sestry mohou zobrazit schválené operace'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        operations = Operation.objects.filter(status='approved')
+        serializer = self.get_serializer(operations, many=True)
+        return Response(serializer.data)
     
     @action(detail=False, methods=['get'])
     def today(self, request):

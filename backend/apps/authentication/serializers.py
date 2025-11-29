@@ -2,6 +2,14 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
+from .models import UserProfile
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    """Serializer pro profil uživatele"""
+    class Meta:
+        model = UserProfile
+        fields = ('role', 'phone_number', 'department')
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -21,10 +29,15 @@ class RegisterSerializer(serializers.ModelSerializer):
         required=True,
         style={'input_type': 'password'}
     )
+    role = serializers.ChoiceField(
+        choices=UserProfile.ROLE_CHOICES,
+        required=False,
+        default='doctor'
+    )
 
     class Meta:
         model = User
-        fields = ('username', 'password', 'password2', 'email', 'first_name', 'last_name')
+        fields = ('username', 'password', 'password2', 'email', 'first_name', 'last_name', 'role')
         extra_kwargs = {
             'first_name': {'required': False},
             'last_name': {'required': False}
@@ -36,8 +49,12 @@ class RegisterSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        role = validated_data.pop('role', 'doctor')
         validated_data.pop('password2')
         user = User.objects.create_user(**validated_data)
+        # Profil se vytvoří automaticky pomocí signálu, ale aktualizujeme roli
+        user.profile.role = role
+        user.profile.save()
         return user
 
 
@@ -53,9 +70,12 @@ class LoginSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     """Serializer pro zobrazení informací o uživateli"""
+    profile = UserProfileSerializer(read_only=True)
+    role = serializers.CharField(source='profile.role', read_only=True)
+    
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'date_joined')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'date_joined', 'profile', 'role')
         read_only_fields = ('id', 'date_joined')
 
 

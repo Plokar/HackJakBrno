@@ -44,6 +44,9 @@ class OperationListSerializer(serializers.ModelSerializer):
     room_name = serializers.SerializerMethodField()
     doctor_name = serializers.SerializerMethodField()
     duration_hours = serializers.ReadOnlyField()
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    approved_by_username = serializers.CharField(source='approved_by.username', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
     
     class Meta:
         model = Operation
@@ -53,10 +56,14 @@ class OperationListSerializer(serializers.ModelSerializer):
         return f"{obj.patient.first_name} {obj.patient.last_name}"
     
     def get_room_name(self, obj):
-        return obj.operating_room.name
+        if obj.operating_room:
+            return obj.operating_room.name
+        return None  # Nebo 'Nepřiřazeno'
     
     def get_doctor_name(self, obj):
-        return f"Dr. {obj.primary_doctor.first_name} {obj.primary_doctor.last_name}"
+        if obj.primary_doctor:
+            return f"Dr. {obj.primary_doctor.first_name} {obj.primary_doctor.last_name}"
+        return None  # Nebo 'Nepřiřazeno'
 
 
 class OperationDetailSerializer(serializers.ModelSerializer):
@@ -73,12 +80,12 @@ class OperationDetailSerializer(serializers.ModelSerializer):
 
 class OperationCreateSerializer(serializers.Serializer):
     """Serializer pro vytvoření operace včetně pacienta"""
-    # Operation fields
-    operation_type = serializers.CharField(max_length=200)
-    operating_room_id = serializers.IntegerField()
-    primary_doctor_id = serializers.IntegerField()
-    scheduled_start = serializers.DateTimeField()
-    scheduled_end = serializers.DateTimeField()
+    # Operation fields - některá pole jsou nepovinná podle role
+    operation_type = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    operating_room_id = serializers.IntegerField(required=False, allow_null=True)
+    primary_doctor_id = serializers.IntegerField(required=False, allow_null=True)
+    scheduled_start = serializers.DateTimeField(required=False, allow_null=True)
+    scheduled_end = serializers.DateTimeField(required=False, allow_null=True)
     is_emergency = serializers.BooleanField(default=False)
     notes = serializers.CharField(required=False, allow_blank=True)
     
@@ -91,23 +98,28 @@ class OperationCreateSerializer(serializers.Serializer):
     patient_medical_history = serializers.CharField(required=False, allow_blank=True)
     
     def validate(self, data):
-        # Validate that end time is after start time
-        if data['scheduled_end'] <= data['scheduled_start']:
-            raise serializers.ValidationError({
-                'scheduled_end': 'Konec operace musí být po začátku'
-            })
+        # Validace pouze pokud jsou pole vyplněna
         
-        # Validate that operating room exists
-        if not OperatingRoom.objects.filter(id=data['operating_room_id']).exists():
-            raise serializers.ValidationError({
-                'operating_room_id': 'Operační sál neexistuje'
-            })
+        # Validate that end time is after start time (pokud jsou obě vyplněna)
+        if data.get('scheduled_end') and data.get('scheduled_start'):
+            if data['scheduled_end'] <= data['scheduled_start']:
+                raise serializers.ValidationError({
+                    'scheduled_end': 'Konec operace musí být po začátku'
+                })
         
-        # Validate that doctor exists
-        if not Doctor.objects.filter(id=data['primary_doctor_id']).exists():
-            raise serializers.ValidationError({
-                'primary_doctor_id': 'Lékař neexistuje'
-            })
+        # Validate that operating room exists (pokud je vyplněn)
+        if data.get('operating_room_id'):
+            if not OperatingRoom.objects.filter(id=data['operating_room_id']).exists():
+                raise serializers.ValidationError({
+                    'operating_room_id': 'Operační sál neexistuje'
+                })
+        
+        # Validate that doctor exists (pokud je vyplněn)
+        if data.get('primary_doctor_id'):
+            if not Doctor.objects.filter(id=data['primary_doctor_id']).exists():
+                raise serializers.ValidationError({
+                    'primary_doctor_id': 'Lékař neexistuje'
+                })
         
         return data
     
@@ -131,17 +143,25 @@ class OperationCreateSerializer(serializers.Serializer):
                 patient.medical_history = validated_data['patient_medical_history']
             patient.save()
         
-        # Create operation
+        # Get request user from context
+        request = self.context.get('request')
+        # Pro DEMO: MockUser nemůže být přiřazen do ForeignKey, takže nastavíme created_by na None
+        # V produkci by zde byl skutečný Django User
+        created_by = None
+        
+        # Create operation - některá pole mohou být NULL podle workflow
+        # Doktor vyplní jen pacienta, sestra přidá typ a personál, admin schválí a přiřadí sál
         operation = Operation.objects.create(
             patient=patient,
-            operating_room_id=validated_data['operating_room_id'],
-            primary_doctor_id=validated_data['primary_doctor_id'],
-            operation_type=validated_data['operation_type'],
-            scheduled_start=validated_data['scheduled_start'],
-            scheduled_end=validated_data['scheduled_end'],
+            operating_room_id=validated_data.get('operating_room_id'),
+            primary_doctor_id=validated_data.get('primary_doctor_id'),
+            operation_type=validated_data.get('operation_type', ''),
+            scheduled_start=validated_data.get('scheduled_start'),
+            scheduled_end=validated_data.get('scheduled_end'),
             is_emergency=validated_data.get('is_emergency', False),
             notes=validated_data.get('notes', ''),
-            status='scheduled'
+            status='draft',  # Operace začíná jako návrh
+            created_by=created_by
         )
         
         return operation
@@ -188,6 +208,30 @@ class DashboardStatsSerializer(serializers.Serializer):
     total_patients = serializers.IntegerField()
     room_utilization = serializers.ListField()
     upcoming_operations = OperationListSerializer(many=True)
+
+
+class OperationApprovalSerializer(serializers.Serializer):
+    """Serializer pro schválení operace adminem"""
+    approved = serializers.BooleanField()
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class OperationStaffAssignmentSerializer(serializers.Serializer):
+    """Serializer pro přiřazení personálu sestrou"""
+    assisting_doctor_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        allow_empty=True
+    )
+    notes = serializers.CharField(required=False, allow_blank=True)
+    
+    def validate_assisting_doctor_ids(self, value):
+        # Ověřit, že všichni doktoři existují
+        from .models import Doctor
+        for doctor_id in value:
+            if not Doctor.objects.filter(id=doctor_id).exists():
+                raise serializers.ValidationError(f"Doktor s ID {doctor_id} neexistuje")
+        return value
 
 
 class OperationToolSerializer(serializers.ModelSerializer):
