@@ -1,19 +1,24 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from datetime import datetime, timedelta
+import csv
+import io
 from .models import (
     OperatingRoom, Patient, Doctor, Equipment, Material,
-    Operation, PerioperativeProtocol, EquipmentUsage, MaterialUsage
+    Operation, PerioperativeProtocol, EquipmentUsage, MaterialUsage,
+    OperationTool
 )
 from .serializers import (
     OperatingRoomSerializer, PatientSerializer, DoctorSerializer,
     EquipmentSerializer, MaterialSerializer, OperationListSerializer,
     OperationDetailSerializer, OperationCreateSerializer, PerioperativeProtocolSerializer,
     DashboardStatsSerializer, EquipmentUsageSerializer, MaterialUsageSerializer,
+    OperationToolSerializer,
     OperationApprovalSerializer, OperationStaffAssignmentSerializer
 )
 
@@ -619,3 +624,166 @@ class DashboardViewSet(viewsets.ViewSet):
         }
         
         return Response(data)
+
+
+class OperationToolViewSet(viewsets.ModelViewSet):
+    """ViewSet pro správu operačních nástrojů s podporou CSV importu"""
+    queryset = OperationTool.objects.all()
+    serializer_class = OperationToolSerializer
+    parser_classes = [MultiPartParser, FormParser]
+    
+    @action(detail=False, methods=['post'], url_path='upload-csv')
+    def upload_csv(self, request):
+        """
+        Upload CSV souboru s nástroji a import do databáze
+        
+        Očekávaný formát CSV (semicolon-delimited):
+        #;Název Nástroje;Kategorie;Fiktivní Inventární Kód;Cena Sterilizace (Kč/Použití Fikt.);UDI DataMatrix Kód (GS1 Formát)
+        """
+        if 'file' not in request.FILES:
+            return Response(
+                {'error': 'Soubor nebyl nahrán. Použijte klíč "file" pro upload.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        csv_file = request.FILES['file']
+        
+        # Ověření, že se jedná o CSV soubor
+        if not csv_file.name.endswith('.csv'):
+            return Response(
+                {'error': 'Soubor musí být ve formátu CSV (.csv)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Přečtení CSV souboru (semicolon delimiter, UTF-8-sig pro BOM)
+            decoded_file = csv_file.read().decode('utf-8-sig')
+            io_string = io.StringIO(decoded_file)
+            reader = csv.DictReader(io_string, delimiter=';')
+            
+            imported = 0
+            updated = 0
+            errors = []
+            
+            for row_num, row in enumerate(reader, start=2):  # Start at 2 (header is row 1)
+                try:
+                    # Mapování CSV sloupců na model fields (Czech column names)
+                    name = row.get('Název Nástroje', '').strip()
+                    category = row.get('Kategorie', '').strip()
+                    inventory_code = row.get('Fiktivní Inventární Kód', '').strip()
+                    sterilization_cost_str = row.get('Cena Sterilizace (Kč/Použití Fikt.)', '').strip()
+                    udi_code = row.get('UDI DataMatrix Kód (GS1 Formát)', '').strip()
+                    
+                    # Validace povinných polí
+                    if not name:
+                        errors.append(f'Řádek {row_num}: Chybí název nástroje')
+                        continue
+                    
+                    if not category:
+                        errors.append(f'Řádek {row_num}: Chybí kategorie')
+                        continue
+                    
+                    # Konverze ceny sterilizace (Czech format: comma as decimal separator)
+                    sterilization_cost = None
+                    if sterilization_cost_str:
+                        try:
+                            # Nahradit čárku tečkou pro Python float
+                            cost_str = sterilization_cost_str.replace(',', '.')
+                            sterilization_cost = float(cost_str)
+                        except ValueError:
+                            errors.append(f'Řádek {row_num}: Neplatná cena sterilizace: {sterilization_cost_str}')
+                            # Continue anyway, set to None
+                    
+                    # Výchozí hodnoty
+                    quantity = 0  # Not in CSV, default to 0
+                    lifespan = None  # Not in CSV
+                    unit = 'použití'  # Default
+                    status_val = 'good'  # Default
+                    
+                    # Automatické určení statusu na základě ceny (volitelné)
+                    if sterilization_cost:
+                        if sterilization_cost > 50:
+                            status_val = 'warning'
+                        elif sterilization_cost > 60:
+                            status_val = 'critical'
+                    
+                    # Vytvoření nebo aktualizace záznamu (podle inventárního kódu nebo názvu)
+                    lookup_field = {}
+                    if inventory_code:
+                        lookup_field['inventory_code'] = inventory_code
+                    else:
+                        lookup_field['name'] = name
+                        lookup_field['category'] = category
+                    
+                    tool, created = OperationTool.objects.update_or_create(
+                        **lookup_field,
+                        defaults={
+                            'name': name,
+                            'category': category,
+                            'inventory_code': inventory_code if inventory_code else None,
+                            'sterilization_cost': sterilization_cost,
+                            'udi_code': udi_code if udi_code else None,
+                            'quantity': quantity,
+                            'lifespan': lifespan,
+                            'unit': unit,
+                            'status': status_val,
+                        }
+                    )
+                    
+                    if created:
+                        imported += 1
+                    else:
+                        updated += 1
+                        
+                except Exception as e:
+                    errors.append(f'Řádek {row_num}: Chyba při zpracování - {str(e)}')
+                    continue
+            
+            result = {
+                'message': 'CSV soubor byl úspěšně zpracován',
+                'imported': imported,
+                'updated': updated,
+                'total_processed': imported + updated,
+            }
+            
+            if errors:
+                result['errors'] = errors
+                result['error_count'] = len(errors)
+            
+            return Response(result, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Chyba při zpracování CSV souboru: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    @action(detail=False, methods=['get'], url_path='export-csv')
+    def export_csv(self, request):
+        """
+        Export všech nástrojů do CSV formátu (semicolon-delimited, Czech format)
+        """
+        response = Response(content_type='text/csv; charset=utf-8-sig')
+        response['Content-Disposition'] = 'attachment; filename="operation_tools.csv"'
+        
+        writer = csv.writer(response, delimiter=';')
+        writer.writerow(['#', 'Název Nástroje', 'Kategorie', 'Fiktivní Inventární Kód', 
+                        'Cena Sterilizace (Kč/Použití Fikt.)', 'UDI DataMatrix Kód (GS1 Formát)'])
+        
+        tools = OperationTool.objects.all()
+        for idx, tool in enumerate(tools, start=1):
+            # Konverze ceny zpět na český formát (čárka místo tečky)
+            cost_str = ''
+            if tool.sterilization_cost:
+                cost_str = str(tool.sterilization_cost).replace('.', ',')
+            
+            writer.writerow([
+                idx,
+                tool.name,
+                tool.category,
+                tool.inventory_code or '',
+                cost_str,
+                tool.udi_code or ''
+            ])
+        
+        return response
