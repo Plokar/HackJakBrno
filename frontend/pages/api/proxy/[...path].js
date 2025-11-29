@@ -9,19 +9,30 @@ export default async function handler(req, res) {
   // Sestavit backend URL - v Dockeru používáme název služby 'backend'
   const isDocker = process.env.DOCKER_ENV === 'true';
   const backendHost = isDocker ? 'http://backend:8000' : 'http://localhost:8000';
-  const backendUrl = `${backendHost}/api/${path.join('/')}`;
+  
+  // Zachovat trailing slash, pokud je v původní URL
+  const pathString = path.join('/');
+  const backendUrl = `${backendHost}/api/${pathString}/`;
 
   console.log(`[Proxy] ${req.method} ${backendUrl}`);
 
   try {
-    const response = await fetch(backendUrl, {
+    // Připravit konfiguraci requestu
+    const fetchOptions = {
       method: req.method,
       headers: {
         'Content-Type': 'application/json',
-        ...req.headers,
+        // Přeposlat X-User-Role header pro mock autentizaci
+        ...(req.headers['x-user-role'] && { 'X-User-Role': req.headers['x-user-role'] }),
       },
-      body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined,
-    });
+    };
+
+    // Pro POST/PUT/PATCH přidat tělo requestu
+    if (req.method !== 'GET' && req.method !== 'HEAD' && req.body) {
+      fetchOptions.body = JSON.stringify(req.body);
+    }
+
+    const response = await fetch(backendUrl, fetchOptions);
 
     const data = await response.json().catch(() => null);
 

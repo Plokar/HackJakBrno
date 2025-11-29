@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import { api } from './api';
 
 const RoleContext = createContext();
@@ -13,6 +13,11 @@ export const useRole = () => {
 
 export const RoleProvider = ({ children }) => {
   const [currentRole, setCurrentRole] = useState('doctor'); // Default role
+
+  // Inicializovat API klient s defaultní rolí při prvním načtení
+  useEffect(() => {
+    api.setUserRole('doctor');
+  }, []);
 
   const changeRole = (role) => {
     setCurrentRole(role);
