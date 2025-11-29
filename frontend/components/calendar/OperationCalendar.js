@@ -8,6 +8,8 @@ import csLocale from '@fullcalendar/core/locales/cs';
 
 const DEFAULT_COLUMN_WIDTH = 150;
 const MAX_COLUMN_WIDTH = 260;
+// výchozí šířka pro měsíční zobrazení (nastaveno na 165px)
+const DEFAULT_MONTH_COLUMN_WIDTH = 165;
 
 export default function OperationCalendar({ operations = [], rooms = [], onEventClick, onDateSelect, onAddOperation }) {
   const calendarRef = useRef(null);
@@ -39,8 +41,12 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     ? operations.filter(op => op.room?.id === selectedRoom)
     : operations;
 
-  const getColumnWidth = (index) => columnWidths[index] || DEFAULT_COLUMN_WIDTH;
-  const resetColumnWidths = () => setColumnWidths({});
+  const getColumnWidth = (index) => {
+    // v měsíčním zobrazení použijeme větší výchozí šířku
+    const defaultWidth = view === 'dayGridMonth' ? DEFAULT_MONTH_COLUMN_WIDTH : DEFAULT_COLUMN_WIDTH;
+    return columnWidths[index] || defaultWidth;
+  };
+  // resetColumnWidths removed — uživatel nemá možnost resetovat šířky jednotlivých sloupců
 
   useEffect(() => {
     const handlePointerMove = (event) => {
@@ -78,40 +84,72 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     const container = calendarContainerRef.current;
     if (!container) return;
 
-    const headerCells = container.querySelectorAll('.fc-col-header-cell');
-    setColumnCount(headerCells.length);
-    const cleanups = [];
+    let cleanups = [];
 
-    headerCells.forEach((cell, index) => {
-      cell.classList.add('calendar-header-resizable');
+    const cleanupHandles = () => {
+      if (cleanups.length) {
+        cleanups.forEach((fn) => fn());
+        cleanups = [];
+      }
+    };
 
-      const ensureHandle = (position) => {
-        const className = `calendar-resize-handle-${position}`;
-        let handle = cell.querySelector(`.${className}`);
-        if (!handle) {
-          handle = document.createElement('div');
-          handle.classList.add('calendar-resize-handle', className);
-          cell.appendChild(handle);
-        }
+    const applyHeaderLogic = () => {
+      const headerCells = container.querySelectorAll('.fc-col-header-cell');
+      if (!headerCells.length) return; // čekáme až se DOM vykreslí
 
-        const pointerDown = (event) => {
-          event.preventDefault();
-          dragStateRef.current.isDragging = true;
-          dragStateRef.current.startX = event.clientX;
-          dragStateRef.current.startWidth = getColumnWidth(index);
-          dragStateRef.current.columnIndex = index;
+      setColumnCount(headerCells.length);
+      // nejprve smaž staré úchyty
+      headerCells.forEach((cell) => {
+        cell.classList.remove('calendar-header-resizable');
+        const handles = cell.querySelectorAll('.calendar-resize-handle');
+        handles.forEach(h => h.remove());
+      });
+      cleanupHandles();
+
+      // v month view nechceme přidávat resize handles
+      if (view === 'dayGridMonth') return;
+
+      headerCells.forEach((cell, index) => {
+        cell.classList.add('calendar-header-resizable');
+
+        const ensureHandle = (position) => {
+          const className = `calendar-resize-handle-${position}`;
+          let handle = cell.querySelector(`.${className}`);
+          if (!handle) {
+            handle = document.createElement('div');
+            handle.classList.add('calendar-resize-handle', className);
+            cell.appendChild(handle);
+          }
+
+          const pointerDown = (event) => {
+            event.preventDefault();
+            dragStateRef.current.isDragging = true;
+            dragStateRef.current.startX = event.clientX;
+            dragStateRef.current.startWidth = getColumnWidth(index);
+            dragStateRef.current.columnIndex = index;
+          };
+
+          handle.addEventListener('pointerdown', pointerDown);
+          cleanups.push(() => handle.removeEventListener('pointerdown', pointerDown));
         };
 
-        handle.addEventListener('pointerdown', pointerDown);
-        cleanups.push(() => handle.removeEventListener('pointerdown', pointerDown));
-      };
+        ensureHandle('left');
+        ensureHandle('right');
+      });
+    };
 
-      ensureHandle('left');
-      ensureHandle('right');
+    // pokusíme se aplikovat hned (první render)
+    applyHeaderLogic();
+
+    // sledování změn v DOM (když FullCalendar přepne view)
+    const observer = new MutationObserver(() => {
+      applyHeaderLogic();
     });
+    observer.observe(container, { childList: true, subtree: true });
 
     return () => {
-      cleanups.forEach((fn) => fn());
+      observer.disconnect();
+      cleanupHandles();
     };
   }, [view, columnWidths]);
 
@@ -317,17 +355,6 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
               Seznam
             </button>
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <button
-              onClick={resetColumnWidths}
-              className="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              Reset šířek
-            </button>
-            <span className="text-xs text-gray-500">
-              Dvojité úchyty u každého dne umožňují ruční změnu
-            </span>
-          </div>
         </div>
       </div>
 
@@ -403,6 +430,25 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
       </div>
 
       <style jsx global>{`
+        /* month full-bleed removed — month view will use the same container width as week view */
+        .calendar-container.full-bleed {
+          position: relative;
+          left: 50%;
+          right: 50%;
+          margin-left: -50vw;
+          margin-right: -50vw;
+          width: 100vw;
+          max-width: 100vw;
+          padding-left: 1.5rem; /* keep same appearance as parent p-6 */
+          padding-right: 1.5rem;
+          box-sizing: border-box;
+        }
+        .calendar-container.full-bleed .fc,
+        .calendar-container.full-bleed .fc .fc-daygrid,
+        .calendar-container.full-bleed .fc .fc-daygrid table {
+          width: 100% !important;
+          max-width: none !important;
+        }
         .calendar-container .fc {
           font-family: inherit;
         }
@@ -465,9 +511,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
           table-layout: auto !important;
           width: auto !important;
         }
-        .calendar-container .fc .fc-daygrid-body table tbody tr td {
-          width: auto !important;
-        }
+        /* month view centering removed (undo) */
       `}</style>
     </div>
   );
