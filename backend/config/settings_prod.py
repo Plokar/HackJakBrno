@@ -7,7 +7,8 @@ DEBUG = False
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'yourdomain.com,www.yourdomain.com').split(',')
 
 # Security settings pro HTTPS
-SECURE_SSL_REDIRECT = True
+# SSL redirect je False, protože nginx již terminuje HTTPS
+SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
@@ -26,24 +27,26 @@ SECURE_HSTS_PRELOAD = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Session security
-SESSION_COOKIE_SAMESITE = 'Strict'  # Přísnější v produkci
+SESSION_COOKIE_SAMESITE = 'Lax'  # Lax místo Strict pro cross-origin API
 SESSION_COOKIE_AGE = 86400  # 24 hodin v produkci
+SESSION_COOKIE_DOMAIN = '.korex.space'  # Sdílení mezi subdoménami
 
 # CSRF security
-CSRF_COOKIE_SAMESITE = 'Strict'
+CSRF_COOKIE_SAMESITE = 'Lax'  # Lax místo Strict pro cross-origin API
 CSRF_USE_SESSIONS = False  # False pro REST API s separate frontend
+CSRF_COOKIE_DOMAIN = '.korex.space'  # Sdílení mezi subdoménami
 
 # CORS pro produkci - nastavte své domény
 CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS',
-    'https://yourdomain.com,https://www.yourdomain.com'
+    'https://medichub.korex.space'
 ).split(',')
 CORS_ALLOW_CREDENTIALS = True
 
 # CSRF Trusted Origins pro produkci
 CSRF_TRUSTED_ORIGINS = os.environ.get(
     'CSRF_TRUSTED_ORIGINS',
-    'https://yourdomain.com,https://www.yourdomain.com'
+    'https://medichub.korex.space'
 ).split(',')
 
 # Password requirements (přísnější v produkci)
