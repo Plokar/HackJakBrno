@@ -318,6 +318,41 @@ class OperationViewSet(viewsets.ModelViewSet):
         response_serializer = OperationDetailSerializer(operation)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
     
+    def update(self, request, *args, **kwargs):
+        """Aktualizace operace - admin může zrušit a přeplánovat schválené operace"""
+        operation = self.get_object()
+        partial = kwargs.pop('partial', False)
+        
+        # Admin může aktualizovat schválené/naplánované operace (zrušit, přeplánovat)
+        if hasattr(request.user, 'profile') and request.user.profile.role == 'admin':
+            if operation.status in ['approved', 'scheduled']:
+                # Admin může aktualizovat status (zrušit) nebo scheduled_start/scheduled_end (přeplánovat)
+                # Použít OperationListSerializer pro update, protože má fields = '__all__'
+                serializer = OperationListSerializer(operation, data=request.data, partial=partial, context={'request': request})
+                if serializer.is_valid():
+                    serializer.save()
+                    # Načíst aktualizovanou operaci a vrátit detailní serializer
+                    operation.refresh_from_db()
+                    response_serializer = OperationDetailSerializer(operation)
+                    return Response(response_serializer.data)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response(
+                    {'error': 'Admin může upravovat pouze schválené nebo naplánované operace'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
+        # Ostatní role nemohou aktualizovat operace přes update endpoint
+        return Response(
+            {'error': 'Nemáte oprávnění k úpravě operace'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    def partial_update(self, request, *args, **kwargs):
+        """PATCH request - stejné jako update s partial=True"""
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
+    
     @action(detail=True, methods=['post'], url_path='submit-for-approval')
     def submit_for_approval(self, request, pk=None):
         """Odeslat operaci ke schválení - pouze doktor, který ji vytvořil"""

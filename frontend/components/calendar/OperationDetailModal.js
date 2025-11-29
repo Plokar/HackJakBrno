@@ -114,6 +114,128 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
     alert('Funkce úpravy operace bude implementována v další verzi. Zde sestřička může doplnit:\n- Asistující lékaře\n- Sestry\n- Poznámky\n- Další parametry');
   };
 
+  const handleCancelOperation = async () => {
+    if (!window.confirm('Opravdu chcete zrušit tuto operaci? Operace bude označena jako zrušená.')) {
+      return;
+    }
+    
+    setActionLoading(true);
+    try {
+      await api.operations.update(operationId, {
+        status: 'cancelled'
+      });
+      await fetchOperationDetails();
+      if (onOperationUpdate) {
+        await onOperationUpdate();
+      }
+      alert('Operace byla úspěšně zrušena!');
+    } catch (err) {
+      console.error('Error cancelling operation:', err);
+      alert('Chyba při rušení operace: ' + (err.message || 'Neznámá chyba'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const formatDateTimeLocal = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const handleRescheduleOperation = async () => {
+    const currentStart = operation.scheduled_start ? formatDateTimeLocal(operation.scheduled_start) : '';
+    const currentEnd = operation.scheduled_end ? formatDateTimeLocal(operation.scheduled_end) : '';
+    
+    // Create a modal dialog for better UX
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+    
+    const dialog = document.createElement('div');
+    dialog.style.cssText = 'background: white; padding: 30px; border-radius: 8px; max-width: 500px; width: 90%;';
+    dialog.innerHTML = `
+      <h3 style="margin-bottom: 20px; font-size: 18px; font-weight: bold;">Přeplánovat operaci</h3>
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Nový začátek:</label>
+        <input type="datetime-local" id="reschedule-start" value="${currentStart}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+      </div>
+      <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Nový konec:</label>
+        <input type="datetime-local" id="reschedule-end" value="${currentEnd}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button id="reschedule-cancel" style="padding: 8px 16px; border: 1px solid #ccc; background: white; border-radius: 4px; cursor: pointer;">Zrušit</button>
+        <button id="reschedule-confirm" style="padding: 8px 16px; background: #E00034; color: white; border: none; border-radius: 4px; cursor: pointer;">Přeplánovat</button>
+      </div>
+    `;
+    
+    modal.appendChild(dialog);
+    document.body.appendChild(modal);
+    
+    return new Promise((resolve) => {
+      const cancelBtn = dialog.querySelector('#reschedule-cancel');
+      const confirmBtn = dialog.querySelector('#reschedule-confirm');
+      const startInput = dialog.querySelector('#reschedule-start');
+      const endInput = dialog.querySelector('#reschedule-end');
+      
+      const cleanup = () => {
+        document.body.removeChild(modal);
+        resolve(false);
+      };
+      
+      cancelBtn.onclick = cleanup;
+      modal.onclick = (e) => {
+        if (e.target === modal) cleanup();
+      };
+      
+      confirmBtn.onclick = async () => {
+        const newStart = startInput.value;
+        const newEnd = endInput.value;
+        
+        if (!newStart || !newEnd) {
+          alert('Musíte zadat nový začátek i konec operace');
+          return;
+        }
+
+        const scheduledStart = new Date(newStart).toISOString();
+        const scheduledEnd = new Date(newEnd).toISOString();
+
+        if (scheduledEnd <= scheduledStart) {
+          alert('Konec operace musí být po začátku');
+          return;
+        }
+
+        document.body.removeChild(modal);
+        resolve({ scheduledStart, scheduledEnd });
+      };
+    }).then(async (result) => {
+      if (!result) return;
+      
+      setActionLoading(true);
+      try {
+        await api.operations.update(operationId, {
+          scheduled_start: result.scheduledStart,
+          scheduled_end: result.scheduledEnd
+        });
+        await fetchOperationDetails();
+        if (onOperationUpdate) {
+          await onOperationUpdate();
+        }
+        alert('Operace byla úspěšně přeplánována!');
+      } catch (err) {
+        console.error('Error rescheduling operation:', err);
+        alert('Chyba při přeplánování operace: ' + (err.message || 'Neznámá chyba'));
+      } finally {
+        setActionLoading(false);
+      }
+    });
+  };
+
   const formatDateTime = (dateString) => {
     if (!dateString) return '-';
     const date = new Date(dateString);
@@ -524,6 +646,52 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
                     ) : (
                       <>
                         ❌ Zamítnout operaci
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+
+              {/* Admin může zrušit a přeplánovat schválené/naplánované operace */}
+              {isAdmin && operation && (operation.status === 'approved' || operation.status === 'scheduled') && (
+                <>
+                  <button
+                    onClick={handleRescheduleOperation}
+                    disabled={actionLoading}
+                    className="px-6 py-2 text-white rounded-lg transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    style={{ backgroundColor: '#A11D30' }}
+                  >
+                    {actionLoading ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Přeplánovávám...
+                      </>
+                    ) : (
+                      <>
+                        📅 Přeplánovat operaci
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleCancelOperation}
+                    disabled={actionLoading}
+                    className="px-6 py-2 text-white rounded-lg transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    style={{ backgroundColor: '#A11D30' }}
+                  >
+                    {actionLoading ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Ruším...
+                      </>
+                    ) : (
+                      <>
+                        ❌ Zrušit operaci
                       </>
                     )}
                   </button>
