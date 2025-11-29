@@ -11,7 +11,7 @@ from .models import (
 from .serializers import (
     OperatingRoomSerializer, PatientSerializer, DoctorSerializer,
     EquipmentSerializer, MaterialSerializer, OperationListSerializer,
-    OperationDetailSerializer, PerioperativeProtocolSerializer,
+    OperationDetailSerializer, OperationCreateSerializer, PerioperativeProtocolSerializer,
     DashboardStatsSerializer, EquipmentUsageSerializer, MaterialUsageSerializer
 )
 
@@ -160,9 +160,21 @@ class OperationViewSet(viewsets.ModelViewSet):
     queryset = Operation.objects.all()
     
     def get_serializer_class(self):
-        if self.action == 'retrieve':
+        if self.action == 'create':
+            return OperationCreateSerializer
+        elif self.action == 'retrieve':
             return OperationDetailSerializer
         return OperationListSerializer
+    
+    def create(self, request, *args, **kwargs):
+        """Vytvoření nové operace včetně pacienta"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        operation = serializer.save()
+        
+        # Vrátit detailní serializér pro odpověď
+        response_serializer = OperationDetailSerializer(operation)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
     
     @action(detail=False, methods=['get'])
     def today(self, request):
