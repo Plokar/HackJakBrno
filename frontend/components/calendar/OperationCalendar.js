@@ -410,7 +410,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div className="flex items-center gap-4 flex-1">
           <h2 className="text-2xl font-bold text-gray-900">Harmonogram operací</h2>
-          
+
           {/* Room Selector */}
           <div className="flex items-center gap-2">
             <label htmlFor="room-select" className="text-sm font-medium text-gray-700">
@@ -552,22 +552,22 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
         <StatCard
           label="Celkem operací"
           value={filteredOperations.length}
-          color="blue"
+          color="custom-red-1"
         />
         <StatCard
           label="Probíhající"
           value={filteredOperations.filter(op => op.status === 'in_progress').length}
-          color="blue"
+          color="custom-red-2"
         />
         <StatCard
           label="Naplánováno"
           value={filteredOperations.filter(op => op.status === 'scheduled').length}
-          color="purple"
+          color="custom-red-3"
         />
         <StatCard
           label="Dokončeno"
           value={filteredOperations.filter(op => op.status === 'completed').length}
-          color="green"
+          color="custom-red-4"
         />
       </div>
 
@@ -680,6 +680,11 @@ function StatCard({ label, value, color }) {
     green: 'bg-green-50 text-green-700',
     purple: 'bg-purple-50 text-purple-700',
     red: 'bg-red-50 text-red-700',
+    // Custom colors - lighter shades
+    'custom-red-1': 'bg-[#E00034]/20 text-black',
+    'custom-red-2': 'bg-[#E00034]/20 text-black',
+    'custom-red-3': 'bg-[#E00034]/20 text-black',
+    'custom-red-4': 'bg-[#E00034]/20 text-black',
   };
 
   return (
