@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { 
@@ -18,6 +18,39 @@ export default function Layout({ children, currentUser }) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    setHasMounted(true);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (date) => {
+    return date.toLocaleTimeString('cs-CZ', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [activeUser, setActiveUser] = useState({
+    name: 'Admin',
+    role: 'Administrátor',
+    avatar: '👨‍💼'
+  });
+
+  const availableUsers = [
+    { name: 'Admin', role: 'Administrátor', avatar: '👨‍💼' },
+    { name: 'Sestřička', role: 'Zdravotní sestra', avatar: '👩‍⚕️' }
+  ];
+
+  const handleUserSwitch = (user) => {
+    setActiveUser(user);
+    setUserMenuOpen(false);
+  };
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: HomeIcon, current: router.pathname === '/' },
@@ -77,18 +110,55 @@ export default function Layout({ children, currentUser }) {
 
         {/* User Info */}
         <div className="absolute bottom-0 w-full p-4 border-t border-gray-200">
-          <div className="flex items-center">
-            <div className="bg-blue-100 rounded-full p-2 mr-3">
-              <UserCircleIcon className="h-6 w-6 text-blue-600" />
+          {/* User Switch Menu - umístěno nad tlačítko */}
+          {userMenuOpen && (
+            <div className="mb-2 py-2 bg-white border border-gray-200 rounded-lg shadow-lg">
+              {availableUsers.map((user) => (
+                <button
+                  key={user.name}
+                  onClick={() => handleUserSwitch(user)}
+                  className={`w-full flex items-center px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${
+                    activeUser.name === user.name ? 'bg-blue-50' : ''
+                  }`}
+                >
+                  <span className="text-xl mr-3">{user.avatar}</span>
+                  <div className="text-left">
+                    <p className="font-medium text-gray-900">{user.name}</p>
+                    <p className="text-xs text-gray-500">{user.role}</p>
+                  </div>
+                  {activeUser.name === user.name && (
+                    <svg className="w-4 h-4 ml-auto text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div 
+            className="flex items-center cursor-pointer hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors"
+            onClick={() => setUserMenuOpen(!userMenuOpen)}
+          >
+            <div className="bg-blue-100 rounded-full p-2 mr-3 text-xl">
+              {activeUser.avatar}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 truncate">
-                {currentUser?.name || 'Admin'}
+                {activeUser.name}
               </p>
               <p className="text-xs text-gray-500 truncate">
-                {currentUser?.role || 'Administrátor'}
+                {activeUser.role}
               </p>
             </div>
+            <svg 
+              className={`w-4 h-4 text-gray-500 transition-transform ${userMenuOpen ? 'rotate-0' : 'rotate-180'}`}
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
           </div>
         </div>
       </div>
@@ -117,6 +187,9 @@ export default function Layout({ children, currentUser }) {
 
             {/* Right Actions */}
             <div className="flex items-center space-x-3">
+              <div className="hidden sm:flex items-center text-black font-mono text-3xl font-bold min-w-[9ch] justify-end">
+                {hasMounted ? formatTime(currentTime) : '--:--:--'}
+              </div>
               <button
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
                 className="relative text-gray-600 hover:text-gray-900 hover:bg-gray-100 p-2 rounded-lg transition-colors"

@@ -24,11 +24,11 @@ export default function RoomStatusGrid({ rooms = [], onRoomClick }) {
     active: {
       label: 'V provozu',
       icon: ClockIcon,
-      bgColor: 'bg-blue-100',
-      borderColor: 'border-blue-400',
-      textColor: 'text-blue-800',
-      iconColor: 'text-blue-600',
-      pulseColor: 'bg-blue-400'
+      bgColor: 'bg-[#fce7ed]',
+      borderColor: 'border-[#C21533]',
+      textColor: 'text-[#C21533]',
+      iconColor: 'text-[#C21533]',
+      pulseColor: 'bg-[#C21533]'
     },
     maintenance: {
       label: 'Údržba',
@@ -255,9 +255,9 @@ export default function RoomStatusGrid({ rooms = [], onRoomClick }) {
 
 function FilterButton({ label, count, active, onClick, color = 'gray' }) {
   const colors = {
-    gray: active ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-    blue: active ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700 hover:bg-blue-200',
-    green: active ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200',
+    gray: active ? 'bg-[#C21533] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+    blue: active ? 'bg-[#C21533] text-white' : 'bg-[#fce7ed] text-[#C21533] hover:bg-[#f9cfe0]',
+    green: active ? 'bg-[#C21533] text-white' : 'bg-green-100 text-green-700 hover:bg-green-200',
   };
 
   return (
