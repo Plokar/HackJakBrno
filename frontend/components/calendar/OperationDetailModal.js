@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 
-export default function OperationDetailModal({ isOpen, onClose, operationId }) {
+export default function OperationDetailModal({ isOpen, onClose, operationId, onOperationUpdate, currentRole = 'doctor' }) {
+  const isDoctor = currentRole === 'doctor';
+  const isAdmin = currentRole === 'admin';
+  const isNurse = currentRole === 'nurse';
+  
   const [operation, setOperation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen && operationId) {
@@ -24,6 +29,89 @@ export default function OperationDetailModal({ isOpen, onClose, operationId }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleApproveOperation = async () => {
+    if (!window.confirm('Opravdu chcete schválit tuto operaci?')) {
+      return;
+    }
+    
+    setActionLoading(true);
+    try {
+      await api.operations.approve(operationId, true, '');
+      await fetchOperationDetails();
+      if (onOperationUpdate) {
+        await onOperationUpdate();
+      }
+      alert('Operace byla úspěšně schválena!');
+    } catch (err) {
+      console.error('Error approving operation:', err);
+      alert('Chyba při schvalování operace: ' + (err.message || 'Neznámá chyba'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRejectOperation = async () => {
+    const reason = prompt('Zadejte důvod zamítnutí operace:');
+    if (reason === null) {
+      return; // Uživatel zrušil
+    }
+    
+    if (!reason.trim()) {
+      alert('Musíte zadat důvod zamítnutí');
+      return;
+    }
+    
+    if (!window.confirm('Opravdu chcete zamítnout tuto operaci? Operace bude trvale smazána.')) {
+      return;
+    }
+    
+    setActionLoading(true);
+    try {
+      await api.operations.approve(operationId, false, reason);
+      if (onOperationUpdate) {
+        await onOperationUpdate();
+      }
+      alert('Operace byla zamítnuta a smazána');
+      onClose(); // Zavřít modal po úspěšném zamítnutí
+    } catch (err) {
+      console.error('Error rejecting operation:', err);
+      alert('Chyba při zamítání operace: ' + (err.message || 'Neznámá chyba'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAssignStaff = async () => {
+    // Pro jednoduchost zatím jen potvrzení - v budoucnu může být modal s výběrem personálu
+    if (!window.confirm('Chcete přiřadit personál k této operaci?')) {
+      return;
+    }
+    
+    setActionLoading(true);
+    try {
+      // Zatím prázdné přiřazení - v budoucnu modal s výběrem
+      await api.operations.assignStaff(operationId, {
+        assisting_doctors: [],
+        nurses: []
+      });
+      await fetchOperationDetails();
+      if (onOperationUpdate) {
+        await onOperationUpdate();
+      }
+      alert('Personál byl úspěšně přiřazen!');
+    } catch (err) {
+      console.error('Error assigning staff:', err);
+      alert('Chyba při přiřazování personálu: ' + (err.message || 'Neznámá chyba'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleEditOperation = () => {
+    // Zobrazit formulář pro úpravu operace
+    alert('Funkce úpravy operace bude implementována v další verzi. Zde sestřička může doplnit:\n- Asistující lékaře\n- Sestry\n- Poznámky\n- Další parametry');
   };
 
   const formatDateTime = (dateString) => {
@@ -50,9 +138,12 @@ export default function OperationDetailModal({ isOpen, onClose, operationId }) {
 
   const getStatusBadge = (status) => {
     const statusMap = {
+      draft: { label: 'Koncept', color: 'bg-gray-100 text-gray-800' },
+      pending_approval: { label: 'Čeká na schválení', color: 'bg-orange-100 text-orange-800 border-2 border-orange-400' },
+      approved: { label: 'Čeká na přiřazení personálu', color: 'bg-amber-100 text-amber-800 border-2 border-amber-400' },
       scheduled: { label: 'Naplánováno', color: 'bg-blue-100 text-blue-800' },
-      in_progress: { label: 'Probíhá', color: 'bg-green-100 text-green-800' },
-      completed: { label: 'Dokončeno', color: 'bg-gray-100 text-gray-800' },
+      in_progress: { label: 'Probíhá', color: 'bg-purple-100 text-purple-800' },
+      completed: { label: 'Dokončeno', color: 'bg-green-100 text-green-800' },
       cancelled: { label: 'Zrušeno', color: 'bg-red-100 text-red-800' }
     };
     const statusInfo = statusMap[status] || { label: status, color: 'bg-gray-100 text-gray-800' };
@@ -318,7 +409,67 @@ export default function OperationDetailModal({ isOpen, onClose, operationId }) {
           </div>
 
           {/* Footer */}
-          <div className="bg-gray-50 px-6 py-4 flex justify-end">
+          <div className="bg-gray-50 px-6 py-4 flex justify-between items-center">
+            <div className="flex gap-3">
+              {/* Admin může schválit nebo zamítnout operace čekající na schválení */}
+              {isAdmin && operation && operation.status === 'pending_approval' && (
+                <>
+                  <button
+                    onClick={handleApproveOperation}
+                    disabled={actionLoading}
+                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {actionLoading ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Schvaluji...
+                      </>
+                    ) : (
+                      <>
+                        ✅ Schválit operaci
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleRejectOperation}
+                    disabled={actionLoading}
+                    className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {actionLoading ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Zamítám...
+                      </>
+                    ) : (
+                      <>
+                        ❌ Zamítnout operaci
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+              
+              {/* Sestra může upravit operaci (doplnit parametry) */}
+              {isNurse && operation && (operation.status === 'approved' || operation.status === 'scheduled') && (
+                <button
+                  onClick={handleEditOperation}
+                  disabled={actionLoading}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  ✏️ Upravit operaci
+                </button>
+              )}
+            </div>
+            
             <button
               onClick={onClose}
               className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"

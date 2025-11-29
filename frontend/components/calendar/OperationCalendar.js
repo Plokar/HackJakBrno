@@ -6,10 +6,11 @@ import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
 import csLocale from '@fullcalendar/core/locales/cs';
 
-export default function OperationCalendar({ operations = [], rooms = [], onEventClick, onDateSelect, onAddOperation }) {
+export default function OperationCalendar({ operations = [], rooms = [], onEventClick, onDateSelect, onAddOperation, currentRole = 'doctor' }) {
   const calendarRef = useRef(null);
   const [view, setView] = useState('timeGridWeek');
   const [selectedRoom, setSelectedRoom] = useState(null);
+  const isDoctor = currentRole === 'doctor';
 
   console.log('OperationCalendar render:', { operationsCount: operations.length, roomsCount: rooms.length });
 
@@ -45,17 +46,25 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
   }));
 
   function getEventColor(status, priority) {
-    if (status === 'completed') return '#10b981';
-    if (status === 'in_progress') return '#3b82f6';
-    if (status === 'cancelled') return '#6b7280';
-    if (priority === 'urgent') return '#dc2626';
-    if (priority === 'high') return '#f59e0b';
-    return '#8b5cf6';
+    // Priorita statusů pro barvy
+    if (status === 'pending_approval') return '#fb923c'; // oranžová - čeká na schválení
+    if (status === 'approved') return '#fbbf24'; // žlutá - čeká na přiřazení personálu
+    if (status === 'in_progress') return '#3b82f6'; // modrá - probíhá
+    if (status === 'completed') return '#10b981'; // zelená - dokončeno
+    if (status === 'cancelled') return '#6b7280'; // šedá - zrušeno
+    
+    // Pokud není speciální status, použij prioritu
+    if (priority === 'urgent') return '#dc2626'; // červená - urgentní
+    if (priority === 'high') return '#f59e0b'; // oranžová - vysoká priorita
+    
+    return '#8b5cf6'; // fialová - standardní
   }
 
   function getEventBorderColor(status) {
-    if (status === 'completed') return '#059669';
+    if (status === 'pending_approval') return '#ea580c'; // tmavší oranžová
+    if (status === 'approved') return '#d97706'; // tmavší žlutá
     if (status === 'in_progress') return '#2563eb';
+    if (status === 'completed') return '#059669';
     if (status === 'cancelled') return '#4b5563';
     return '#7c3aed';
   }
@@ -77,7 +86,8 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
       onDateSelect({
         start: selectInfo.start,
         end: selectInfo.end,
-        allDay: selectInfo.allDay
+        allDay: selectInfo.allDay,
+        roomId: selectedRoom  // Přidat vybraný sál
       });
     }
   };
@@ -125,7 +135,8 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
             </select>
           </div>
 
-          {/* Add Operation Button */}
+          {/* Add Operation Button - pouze pro doktora */}
+          {isDoctor && (
           <button
             onClick={() => onAddOperation && onAddOperation()}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
@@ -133,8 +144,9 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            Přidat operaci
+            Vytvořit žádost o operaci
           </button>
+          )}
         </div>
         
         {/* View Selector */}
@@ -184,12 +196,15 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
 
       {/* Legend */}
       <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-        <LegendItem color="#dc2626" label="Urgentní" />
-        <LegendItem color="#f59e0b" label="Vysoká priorita" />
-        <LegendItem color="#8b5cf6" label="Standardní" />
+        <LegendItem color="#fb923c" label="Čeká na schválení" />
+        <LegendItem color="#fbbf24" label="Čeká na personál" />
+        <LegendItem color="#8b5cf6" label="Naplánováno" />
         <LegendItem color="#3b82f6" label="Probíhá" />
         <LegendItem color="#10b981" label="Dokončeno" />
         <LegendItem color="#6b7280" label="Zrušeno" />
+        <div className="w-full border-t border-gray-300 my-1"></div>
+        <LegendItem color="#dc2626" label="Urgentní" />
+        <LegendItem color="#f59e0b" label="Vysoká priorita" />
       </div>
 
       {/* Calendar */}

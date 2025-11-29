@@ -4,8 +4,10 @@ import OperationCalendar from '../components/calendar/OperationCalendar';
 import AddOperationModal from '../components/calendar/AddOperationModal';
 import OperationDetailModal from '../components/calendar/OperationDetailModal';
 import { api } from '../lib/api';
+import { useRole } from '../lib/RoleContext';
 
 export default function CalendarPage() {
+  const { currentRole, isDoctor, isAdmin, isNurse } = useRole();
   const [operations, setOperations] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [doctors, setDoctors] = useState([]);
@@ -82,10 +84,11 @@ export default function CalendarPage() {
 
   const handleDateSelect = (selectInfo) => {
     console.log('Date selected:', selectInfo);
-    // Uložit vybraný časový úsek
+    // Uložit vybraný časový úsek včetně roomId
     setSelectedTimeSlot({
       start: selectInfo.start,
-      end: selectInfo.end
+      end: selectInfo.end,
+      roomId: selectInfo.roomId  // Přidat roomId z kalendáře
     });
     setIsAddModalOpen(true);
   };
@@ -125,7 +128,12 @@ export default function CalendarPage() {
         patient_medical_history: formData.patientMedicalHistory
       };
 
-      await api.operations.create(operationData);
+      const newOperation = await api.operations.create(operationData);
+      
+      // Doktor automaticky posílá na schválení
+      if (isDoctor && newOperation.id) {
+        await api.operations.submitForApproval(newOperation.id);
+      }
       
       // Znovu načíst operace
       await fetchData();
@@ -134,7 +142,11 @@ export default function CalendarPage() {
       setIsAddModalOpen(false);
       
       // Zobrazit úspěšnou zprávu
-      alert('Operace byla úspěšně přidána!');
+      if (isDoctor) {
+        alert('Operace byla vytvořena a odeslána ke schválení!');
+      } else {
+        alert('Operace byla úspěšně přidána!');
+      }
     } catch (error) {
       console.error('Error creating operation:', error);
       throw error;
@@ -164,6 +176,7 @@ export default function CalendarPage() {
         onEventClick={handleEventClick}
         onDateSelect={handleDateSelect}
         onAddOperation={handleAddOperation}
+        currentRole={currentRole}
       />
 
       <AddOperationModal
@@ -173,12 +186,15 @@ export default function CalendarPage() {
         rooms={rooms}
         doctors={doctors}
         initialTimeSlot={selectedTimeSlot}
+        currentRole={currentRole}
       />
 
       <OperationDetailModal
         isOpen={isDetailModalOpen}
         onClose={handleCloseDetailModal}
         operationId={selectedOperationId}
+        onOperationUpdate={fetchData}
+        currentRole={currentRole}
       />
     </>
   );

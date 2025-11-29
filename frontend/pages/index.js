@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import { useRole } from '../lib/RoleContext';
 import RealTimeDashboard from '../components/dashboard/RealTimeDashboard';
 import RoomDetailModal from '../components/dashboard/RoomDetailModal';
 
 export default function Home() {
+  const { currentRole, isDoctor, isAdmin, isNurse } = useRole();
   const [roomsData, setRoomsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -19,7 +21,13 @@ export default function Home() {
 
   const fetchDashboardData = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/medic/dashboard/stats/`, {
+      // Použít proxy endpoint
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const url = apiUrl.startsWith('/api/proxy') 
+        ? '/api/proxy/medic/dashboard/stats/'
+        : `${apiUrl}/medic/dashboard/stats/`;
+      
+      const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -31,15 +39,16 @@ export default function Home() {
       }
 
       const data = await response.json();
+      console.log('Dashboard data loaded:', data.room_utilization?.length, 'rooms');
       setRoomsData(data.room_utilization || []);
       setError(null);
       setLoading(false);
     } catch (err) {
       console.error('Dashboard API Error:', err);
-      // Fallback to mock data for development
+      // Show error but try to load anyway
+      setError('Používám mock data - backend není dostupný');
       const mockData = generateMockRoomsData();
       setRoomsData(mockData);
-      setError(null); // Don't show error in dev mode with mock data
       setLoading(false);
     }
   };
@@ -66,40 +75,29 @@ export default function Home() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center max-w-md">
-          <div className="bg-red-100 text-red-800 rounded-lg p-6">
-            <h2 className="text-xl font-bold mb-2">Chyba při načítání dat</h2>
-            <p className="text-sm">{error}</p>
-            <button
-              onClick={fetchDashboardData}
-              className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Zkusit znovu
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
       <Head>
         <title>Dashboard - Medic Hub</title>
       </Head>
       
+      {error && (
+        <div className="mb-4 bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-2 rounded-lg text-sm">
+          ⚠️ {error}
+        </div>
+      )}
+      
       <RealTimeDashboard 
         data={roomsData} 
         onRoomClick={handleRoomClick}
+        currentRole={currentRole}
       />
 
       <RoomDetailModal 
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         roomId={selectedRoomId}
+        currentRole={currentRole}
       />
     </>
   );
