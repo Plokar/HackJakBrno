@@ -28,6 +28,20 @@ export default function Header() {
               <span>Dashboard</span>
             </a>
             <a 
+              href="/patients" 
+              className="text-blue-200 hover:text-white transition-colors font-medium flex items-center space-x-2"
+            >
+              <span>👥</span>
+              <span>Pacienti</span>
+            </a>
+            <a 
+              href="/staff" 
+              className="text-blue-200 hover:text-white transition-colors font-medium flex items-center space-x-2"
+            >
+              <span>⚕️</span>
+              <span>Personál</span>
+            </a>
+            <a 
               href="#rooms" 
               className="text-blue-200 hover:text-white transition-colors font-medium flex items-center space-x-2"
             >

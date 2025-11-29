@@ -1,0 +1,23 @@
+# Nastavení konců řádků pro Git
+* text=auto
+
+# Shell skripty musí mít LF konce řádků
+*.sh text eol=lf
+
+# Python soubory
+*.py text eol=lf
+
+# JavaScript/TypeScript
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+
+# Config soubory
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+
+# Dockerfile
+Dockerfile* text eol=lf
