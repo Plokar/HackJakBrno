@@ -1,0 +1,18 @@
+zn "%SYS"
+set exists = ##class(Security.Applications).Exists("/fhir/r4")
+write "Web app /fhir/r4 exists: ", exists, !
+
+write "Listing all web apps:", !
+set rs = ##class(%ResultSet).%New("Security.Applications:List")
+do rs.Execute()
+while rs.Next() {
+    if rs.Data("Name") [ "fhir" {
+        write "  ", rs.Data("Name"), !
+    }
+}
+
+zn "FHIRSERVER"
+write "Checking FHIRSERVER namespace...", !
+write "Namespace exists: ", ##class(%SYS.Namespace).Exists("FHIRSERVER"), !
+
+halt

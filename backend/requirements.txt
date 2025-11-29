@@ -20,3 +20,17 @@ gunicorn>=21.0.0
 
 # Security & utilities
 django-environ>=0.11.0
+
+# FHIR Integration
+fhirclient==4.1.0
+fhir.resources==7.0.2
+requests>=2.31.0
+
+# Async support
+celery>=5.3.0
+redis>=5.0.0
+
+# WebSocket pro real-time
+channels>=4.0.0
+channels-redis>=4.1.0
+daphne>=4.0.0

@@ -13,21 +13,46 @@ services:
     networks:
       - app-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: medichub_redis_dev
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+    volumes:
+      - redis_data_dev:/data
+
   backend:
     build: 
       context: ./backend
       dockerfile: Dockerfile.dev
-    command: /usr/local/bin/docker-entrypoint.sh
+    command: >
+      bash -c "
+      echo 'Waiting for PostgreSQL...' &&
+      while ! nc -z db 5432; do sleep 0.1; done &&
+      echo 'PostgreSQL started' &&
+      python manage.py migrate --noinput &&
+      python manage.py runserver 0.0.0.0:8000
+      "
     volumes:
       - ./backend:/code  # live reload
     env_file:
       - .env
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings_dev
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     ports:
       - "8000:8000"
     depends_on:
-      - db
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+      fhir-server:
+        condition: service_started
     networks:
       - app-network
 
@@ -53,8 +78,39 @@ services:
     networks:
       - app-network
 
+  fhir-server:
+    build:
+      context: ./iris-fhir-template-master
+      dockerfile: Dockerfile
+    container_name: medichub_fhir_dev
+    restart: always
+    ports:
+      - "32782:1972"
+      - "32783:52773"
+      - "32784:53773"
+    volumes:
+      - ./iris-fhir-template-master/data:/data
+      - ./iris-fhir-template-master/fhirUI:/usr/irissys/csp/fhirUI
+    environment:
+      - IRIS_PASSWORD=SYS
+      - IRIS_USERNAME=SuperUser
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:52773/fhir/r4/metadata || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    command:
+      - -a
+      - iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords("*")'
+      - --check-caps false
+
 volumes:
   postgres_data_dev:
+  fhir_data_dev:
+  redis_data_dev:
 
 networks:
   app-network:
