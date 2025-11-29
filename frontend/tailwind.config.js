@@ -5,16 +5,21 @@ module.exports = {
     extend: {
       colors: {
         primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
+          50: '#fce7ed',
+          100: '#f9cfe0',
+          200: '#f39fc1',
+          300: '#ed6fa2',
+          400: '#e73f83',
+          500: '#E00034',
+          600: '#b3002a',
+          700: '#860020',
+          800: '#5a0015',
+          900: '#2d000b',
+        },
+        dashboard: {
+          DEFAULT: '#E00034',
+          light: '#fce7ed',
+          dark: '#b3002a',
         },
         medical: {
           red: '#dc2626',

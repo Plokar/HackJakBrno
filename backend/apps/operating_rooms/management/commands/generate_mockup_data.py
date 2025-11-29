@@ -224,10 +224,10 @@ class Command(BaseCommand):
         
         for operation in completed_ops:
             # Náklady na personál
-            duration = operation.duration_hours
+            duration = float(operation.duration_hours) if operation.duration_hours else 0.0
             staff_cost = (
-                operation.primary_doctor.hourly_rate * duration +
-                sum(d.hourly_rate for d in operation.assisting_doctors.all()) * duration
+                float(operation.primary_doctor.hourly_rate) * duration +
+                sum(float(d.hourly_rate) for d in operation.assisting_doctors.all()) * duration
             )
             
             protocol = PerioperativeProtocol.objects.create(
@@ -244,7 +244,7 @@ class Command(BaseCommand):
             used_equipment = random.sample(equipment_list, k=random.randint(3, 6))
             for equip in used_equipment:
                 hours = duration
-                cost = equip.hourly_depreciation * hours
+                cost = float(equip.hourly_depreciation) * hours
                 EquipmentUsage.objects.create(
                     protocol=protocol,
                     equipment=equip,
@@ -259,7 +259,7 @@ class Command(BaseCommand):
             used_materials = random.sample(materials, k=random.randint(5, 10))
             for mat in used_materials:
                 quantity = random.randint(1, 5)
-                cost = mat.unit_price * quantity
+                cost = float(mat.unit_price) * quantity
                 MaterialUsage.objects.create(
                     protocol=protocol,
                     material=mat,
