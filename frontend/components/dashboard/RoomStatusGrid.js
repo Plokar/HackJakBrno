@@ -10,6 +10,9 @@ import classNames from 'classnames';
 
 export default function RoomStatusGrid({ rooms = [], onRoomClick }) {
   const [filter, setFilter] = useState('all');
+  
+  // Debug: Log received rooms
+  console.log('RoomStatusGrid received rooms:', rooms.length, rooms);
 
   const statusConfig = {
     available: {

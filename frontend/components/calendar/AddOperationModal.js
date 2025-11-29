@@ -218,7 +218,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
         {/* Modal panel */}
         <div className="inline-block w-full max-w-4xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white rounded-lg shadow-xl">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-4">
+          <div className="bg-gradient-to-r from-[#C21533] to-[#8f0f26] px-6 py-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-bold text-white">
                 Přidat novou operaci
@@ -257,7 +257,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     name="operationType"
                     value={formData.operationType}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.operationType ? 'border-red-300' : 'border-gray-300'
                     }`}
                   >
@@ -279,7 +279,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     name="operatingRoomId"
                     value={formData.operatingRoomId}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.operatingRoomId ? 'border-red-300' : 'border-gray-300'
                     }`}
                   >
@@ -301,7 +301,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     name="primaryDoctorId"
                     value={formData.primaryDoctorId}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.primaryDoctorId ? 'border-red-300' : 'border-gray-300'
                     }`}
                   >
@@ -326,7 +326,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     name="scheduledStart"
                     value={formData.scheduledStart}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.scheduledStart ? 'border-red-300' : 'border-gray-300'
                     }`}
                   />
@@ -344,7 +344,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     name="scheduledEnd"
                     value={formData.scheduledEnd}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.scheduledEnd ? 'border-red-300' : 'border-gray-300'
                     }`}
                   />
@@ -359,7 +359,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     name="isEmergency"
                     checked={formData.isEmergency}
                     onChange={handleChange}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="w-4 h-4 text-[#C21533] border-gray-300 rounded focus:ring-[#C21533]"
                   />
                   <label className="ml-2 text-sm font-medium text-gray-700">
                     Urgentní operace
@@ -375,7 +375,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     value={formData.notes}
                     onChange={handleChange}
                     rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent"
                     placeholder="Dodatečné informace o operaci..."
                   ></textarea>
                 </div>
@@ -390,7 +390,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
               </h4>
               
               {/* Rodné číslo a tlačítko pro načtení */}
-              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="mb-4 p-4 bg-[#fce7ed] border border-[#C21533] rounded-lg">
                 <div className="flex items-end gap-3">
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -401,7 +401,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                       name="patientBirthNumber"
                       value={formData.patientBirthNumber}
                       onChange={handleChange}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                         errors.patientBirthNumber ? 'border-red-300' : 'border-gray-300'
                       }`}
                       placeholder="123456/7890"
@@ -414,7 +414,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     type="button"
                     onClick={handleLoadPatient}
                     disabled={isLoadingPatient || !formData.patientBirthNumber}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-4 py-2 bg-[#C21533] text-white rounded-lg hover:bg-[#8f0f26] transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {isLoadingPatient ? (
                       <>
@@ -453,7 +453,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     name="patientFirstName"
                     value={formData.patientFirstName}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.patientFirstName ? 'border-red-300' : 'border-gray-300'
                     } ${isPatientLoaded ? 'bg-green-50' : ''}`}
                     placeholder="Jan"
@@ -473,7 +473,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     name="patientLastName"
                     value={formData.patientLastName}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.patientLastName ? 'border-red-300' : 'border-gray-300'
                     } ${isPatientLoaded ? 'bg-green-50' : ''}`}
                     placeholder="Novák"
@@ -493,7 +493,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     name="patientDateOfBirth"
                     value={formData.patientDateOfBirth}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.patientDateOfBirth ? 'border-red-300' : 'border-gray-300'
                     } ${isPatientLoaded ? 'bg-green-50' : ''}`}
                   />
@@ -512,7 +512,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     value={formData.patientDiagnosis}
                     onChange={handleChange}
                     rows={2}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.patientDiagnosis ? 'border-red-300' : 'border-gray-300'
                     } ${isPatientLoaded ? 'bg-green-50' : ''}`}
                     placeholder="Popis diagnózy..."
@@ -532,7 +532,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     value={formData.patientMedicalHistory}
                     onChange={handleChange}
                     rows={3}
-                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       isPatientLoaded ? 'bg-green-50' : ''
                     }`}
                     placeholder="Předchozí zdravotní problémy, alergie, léky..."
@@ -553,7 +553,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
               </button>
               <button
                 type="submit"
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-[#C21533] text-white rounded-lg hover:bg-[#8f0f26] transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? 'Ukládám...' : 'Uložit operaci'}

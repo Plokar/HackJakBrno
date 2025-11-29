@@ -250,7 +250,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
               id="room-select"
               value={selectedRoom || ''}
               onChange={(e) => setSelectedRoom(e.target.value ? parseInt(e.target.value) : null)}
-              className="w-48 px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-48 px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#C21533] focus:border-transparent"
             >
               <option value="">Všechny sály</option>
               {rooms.map(room => (
@@ -264,7 +264,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
           {/* Add Operation Button */}
           <button
             onClick={() => onAddOperation && onAddOperation()}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2 bg-[#C21533] text-white rounded-lg hover:bg-[#8f0f26] transition-colors text-sm font-medium"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -280,7 +280,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
               onClick={() => handleViewChange('timeGridDay')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 view === 'timeGridDay'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-[#C21533] text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -290,7 +290,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
               onClick={() => handleViewChange('timeGridWeek')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 view === 'timeGridWeek'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-[#C21533] text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -300,7 +300,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
               onClick={() => handleViewChange('dayGridMonth')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 view === 'dayGridMonth'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-[#C21533] text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -310,7 +310,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
               onClick={() => handleViewChange('listWeek')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 view === 'listWeek'
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-[#C21533] text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -407,17 +407,17 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
           font-family: inherit;
         }
         .calendar-container .fc-button {
-          background-color: #3b82f6;
-          border-color: #3b82f6;
+          background-color: #C21533;
+          border-color: #C21533;
           text-transform: capitalize;
         }
         .calendar-container .fc-button:hover {
-          background-color: #2563eb;
-          border-color: #2563eb;
+          background-color: #8f0f26;
+          border-color: #8f0f26;
         }
         .calendar-container .fc-button-active {
-          background-color: #1d4ed8 !important;
-          border-color: #1d4ed8 !important;
+          background-color: #8f0f26 !important;
+          border-color: #8f0f26 !important;
         }
         .calendar-container .calendar-header-resizable {
           position: relative;
@@ -438,7 +438,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
         }
         .calendar-container .calendar-resize-handle:hover,
         .calendar-container .calendar-resize-handle:active {
-          background-color: rgba(59, 130, 246, 0.2);
+          background-color: rgba(194, 21, 51, 0.2);
         }
         .calendar-container .fc-col-header-cell-cushion {
           font-size: 0.95rem;
