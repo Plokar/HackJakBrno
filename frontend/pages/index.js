@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import RealTimeDashboard from '../components/dashboard/RealTimeDashboard';
+import RoomDetailModal from '../components/dashboard/RoomDetailModal';
 
 export default function Home() {
   const [roomsData, setRoomsData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedRoomId, setSelectedRoomId] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -16,7 +19,7 @@ export default function Home() {
 
   const fetchDashboardData = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/operating-rooms/dashboard/`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/medic/dashboard/stats/`, {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -28,7 +31,7 @@ export default function Home() {
       }
 
       const data = await response.json();
-      setRoomsData(data.rooms || []);
+      setRoomsData(data.room_utilization || []);
       setError(null);
       setLoading(false);
     } catch (err) {
@@ -43,7 +46,13 @@ export default function Home() {
 
   const handleRoomClick = (room) => {
     console.log('Room clicked:', room);
-    // TODO: Open room detail modal
+    setSelectedRoomId(room.id);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedRoomId(null);
   };
 
   if (loading) {
@@ -85,6 +94,12 @@ export default function Home() {
       <RealTimeDashboard 
         data={roomsData} 
         onRoomClick={handleRoomClick}
+      />
+
+      <RoomDetailModal 
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        roomId={selectedRoomId}
       />
     </>
   );

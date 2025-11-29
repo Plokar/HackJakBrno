@@ -255,9 +255,9 @@ export default function RoomStatusGrid({ rooms = [], onRoomClick }) {
 
 function FilterButton({ label, count, active, onClick, color = 'gray' }) {
   const colors = {
-    gray: active ? 'bg-[#C21533] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+    gray: active ? 'bg-[#C21533] text-white' : 'bg-gray-100 text-gray-700 hover:bg-[#f9cfe0]',
     blue: active ? 'bg-[#C21533] text-white' : 'bg-[#fce7ed] text-[#C21533] hover:bg-[#f9cfe0]',
-    green: active ? 'bg-[#C21533] text-white' : 'bg-green-100 text-green-700 hover:bg-green-200',
+    green: active ? 'bg-green-500 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200',
   };
 
   return (

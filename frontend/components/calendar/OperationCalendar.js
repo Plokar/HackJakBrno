@@ -83,13 +83,16 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
   };
 
   const renderEventContent = (eventInfo) => {
+    const roomName = eventInfo.event.extendedProps.room?.name || '';
     return (
-      <div className="p-1">
-        <div className="font-semibold text-xs truncate">{eventInfo.timeText}</div>
-        <div className="text-xs truncate">{eventInfo.event.title}</div>
-        {eventInfo.event.extendedProps.room && (
-          <div className="text-xs opacity-75 truncate">
-            {eventInfo.event.extendedProps.room.name}
+      <div className="p-1 leading-tight space-y-0.5">
+        <div className="font-semibold text-[11px] truncate">{eventInfo.timeText}</div>
+        <div className="text-[11px] font-medium break-words max-h-[2.4em] overflow-hidden">
+          {eventInfo.event.title}
+        </div>
+        {roomName && (
+          <div className="text-[10px] opacity-75 break-words max-h-[2.2em] overflow-hidden">
+            {roomName}
           </div>
         )}
       </div>
@@ -111,7 +114,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
               id="room-select"
               value={selectedRoom || ''}
               onChange={(e) => setSelectedRoom(e.target.value ? parseInt(e.target.value) : null)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-48 px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Všechny sály</option>
               {rooms.map(room => (
@@ -208,8 +211,8 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
           selectMirror={true}
           dayMaxEvents={true}
           weekends={true}
-          slotMinTime="06:00:00"
-          slotMaxTime="22:00:00"
+          slotMinTime="00:00:00"
+          slotMaxTime="24:00:00"
           slotDuration="00:30:00"
           height="auto"
           eventContent={renderEventContent}
