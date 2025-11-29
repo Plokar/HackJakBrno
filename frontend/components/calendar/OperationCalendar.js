@@ -11,6 +11,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
   const MAX_COLUMN_WIDTH = 260;
   // výchozí šířka pro měsíční zobrazení (nastaveno na 165px)
   const DEFAULT_MONTH_COLUMN_WIDTH = 165;
+  // stripEmojis removed from here — using module-level function
   const calendarRef = useRef(null);
   const calendarContainerRef = useRef(null);
   const columnStyleRef = useRef(null);
@@ -370,11 +371,13 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     overflow: 'hidden'
   });
 
-  const renderEventContent = (eventInfo) => {
-    const roomName = eventInfo.event.extendedProps.room?.name || '';
-    const isHighlighted = eventInfo.event.extendedProps.isHighlighted;
-    const isPast = eventInfo.event.extendedProps.isPast;
-    const status = eventInfo.event.extendedProps.status;
+  const renderEventContent = (arg) => {
+    // sanitize title + other text parts to remove emojis
+    const title = stripEmojis(arg.event.title || '');
+    const roomName = arg.event.extendedProps.room?.name || '';
+    const isHighlighted = arg.event.extendedProps.isHighlighted;
+    const isPast = arg.event.extendedProps.isPast;
+    const status = arg.event.extendedProps.status;
     
     // Status emoji
     let statusEmoji = '';
@@ -382,14 +385,15 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     else if (status === 'in_progress') statusEmoji = '⏱️';
     else if (status === 'cancelled') statusEmoji = '❌';
     else if (isPast && status !== 'completed') statusEmoji = '⚠️';
+
     
     return (
       <div className={`p-1 leading-snug space-y-0.5 text-[15px] ${isHighlighted ? 'text-white animate-pulse' : 'text-gray-900'} ${isPast && status !== 'completed' ? 'opacity-60' : ''}`}>
         <div className="font-semibold text-[15px] truncate">
-          {eventInfo.timeText} {statusEmoji}
+          {arg.timeText} {statusEmoji}
         </div>
         <div className="font-semibold whitespace-normal break-words" style={clampStyle(2)}>
-          {eventInfo.event.title}
+          {title}
           {isHighlighted && ' 📍'}
         </div>
         {roomName && (
@@ -495,27 +499,14 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
       {/* Legend */}
       <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
         <div className="w-full mb-2">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Status operací:</h3>
-          <div className="flex flex-wrap gap-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Legenda</h3>
+          <div className="flex flex-wrap gap-4 items-center">
             <LegendItem color="#fb923c" label="Čeká na schválení" />
-            <LegendItem color="#fbbf24" label="Čeká na personál" />
             <LegendItem color="#8b5cf6" label="Naplánováno" />
-            <LegendItem color="#3b82f6" label="⏱️ Probíhá" />
-            <LegendItem color="#10b981" label="✅ Dokončeno" />
-            <LegendItem color="#6b7280" label="❌ Zrušeno" />
-          </div>
-        </div>
-        <div className="w-full border-t border-gray-300 my-1"></div>
-        <div className="w-full">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Priorita:</h3>
-          <div className="flex flex-wrap gap-4">
+            <LegendItem color="#3b82f6" label="Probíhá" />
+            <LegendItem color="#10b981" label="Dokončeno" />
             <LegendItem color="#dc2626" label="Urgentní" />
-            <LegendItem color="#f59e0b" label="Vysoká priorita" />
           </div>
-        </div>
-        <div className="w-full border-t border-gray-300 my-1"></div>
-        <div className="text-xs text-gray-600">
-          ⚠️ Operace v minulosti (neukončené) jsou zobrazeny šedě
         </div>
       </div>
 
@@ -668,14 +659,17 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
   );
 }
 
+// helper: remove emoji characters from a string
+function stripEmojis(text) {
+  if (typeof text !== 'string') return text;
+  return text.replace(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
+}
+
 function LegendItem({ color, label }) {
   return (
-    <div className="flex items-center">
-      <div
-        className="w-4 h-4 rounded mr-2"
-        style={{ backgroundColor: color }}
-      ></div>
-      <span className="text-sm text-gray-700">{label}</span>
+    <div className="flex items-center gap-2">
+      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+      <span className="text-sm text-gray-700">{stripEmojis(label)}</span>
     </div>
   );
 }

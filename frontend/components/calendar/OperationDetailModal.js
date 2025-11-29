@@ -178,7 +178,7 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
         {/* Modal panel */}
         <div className="inline-block w-full max-w-4xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white rounded-lg shadow-xl">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-4">
+          <div className="px-6 py-4 bg-gradient-to-r from-[#A11D30] to-[#A11D30]">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-bold text-white flex items-center">
                 <span className="text-2xl mr-3">⚕️</span>
@@ -199,7 +199,7 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
           <div className="px-6 py-4 max-h-[calc(100vh-200px)] overflow-y-auto">
             {loading && (
               <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: '#A11D30' }}></div>
                 <p className="ml-4 text-gray-600">Načítám data...</p>
               </div>
             )}
@@ -223,8 +223,8 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
 
                 {/* Časy */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <h5 className="text-sm font-semibold text-blue-900 mb-3 flex items-center">
+                  <div className="rounded-lg p-4" style={{ backgroundColor: 'rgba(161,29,48,0.08)' }}>
+                    <h5 className="text-sm font-semibold mb-3 flex items-center" style={{ color: '#6D1F27' }}>
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
@@ -232,23 +232,23 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
                     </h5>
                     <div className="space-y-2">
                       <div>
-                        <p className="text-xs text-blue-700">Začátek</p>
-                        <p className="text-sm font-medium text-blue-900">{formatDateTime(operation.scheduled_start)}</p>
+                        <p className="text-xs" style={{ color: '#6D1F27' }}>Začátek</p>
+                        <p className="text-sm font-medium" style={{ color: '#6D1F27' }}>{formatDateTime(operation.scheduled_start)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-blue-700">Konec</p>
-                        <p className="text-sm font-medium text-blue-900">{formatDateTime(operation.scheduled_end)}</p>
+                        <p className="text-xs" style={{ color: '#6D1F27' }}>Konec</p>
+                        <p className="text-sm font-medium" style={{ color: '#6D1F27' }}>{formatDateTime(operation.scheduled_end)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-blue-700">Plánovaná délka</p>
-                        <p className="text-sm font-medium text-blue-900">{calculateDuration()}</p>
+                        <p className="text-xs" style={{ color: '#6D1F27' }}>Plánovaná délka</p>
+                        <p className="text-sm font-medium" style={{ color: '#6D1F27' }}>{calculateDuration()}</p>
                       </div>
                     </div>
                   </div>
 
                   {(operation.actual_start || operation.actual_end) && (
-                    <div className="bg-green-50 rounded-lg p-4">
-                      <h5 className="text-sm font-semibold text-green-900 mb-3 flex items-center">
+                    <div className="rounded-lg p-4" style={{ backgroundColor: 'rgba(161,29,48,0.08)' }}>
+                      <h5 className="text-sm font-semibold mb-3 flex items-center" style={{ color: '#6D1F27' }}>
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
@@ -257,20 +257,20 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
                       <div className="space-y-2">
                         {operation.actual_start && (
                           <div>
-                            <p className="text-xs text-green-700">Zahájení</p>
-                            <p className="text-sm font-medium text-green-900">{formatDateTime(operation.actual_start)}</p>
+                            <p className="text-xs" style={{ color: '#6D1F27' }}>Zahájení</p>
+                            <p className="text-sm font-medium" style={{ color: '#6D1F27' }}>{formatDateTime(operation.actual_start)}</p>
                           </div>
                         )}
                         {operation.actual_end && (
                           <div>
-                            <p className="text-xs text-green-700">Ukončení</p>
-                            <p className="text-sm font-medium text-green-900">{formatDateTime(operation.actual_end)}</p>
+                            <p className="text-xs" style={{ color: '#6D1F27' }}>Ukončení</p>
+                            <p className="text-sm font-medium" style={{ color: '#6D1F27' }}>{formatDateTime(operation.actual_end)}</p>
                           </div>
                         )}
                         {operation.duration_hours > 0 && (
                           <div>
-                            <p className="text-xs text-green-700">Skutečná délka</p>
-                            <p className="text-sm font-medium text-green-900">{operation.duration_hours.toFixed(2)} hodin</p>
+                            <p className="text-xs" style={{ color: '#6D1F27' }}>Skutečná délka</p>
+                            <p className="text-sm font-medium" style={{ color: '#6D1F27' }}>{operation.duration_hours.toFixed(2)} hodin</p>
                           </div>
                         )}
                       </div>
@@ -280,8 +280,8 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
 
                 {/* Pacient */}
                 {operation.patient && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h5 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                  <div className="rounded-lg p-4" style={{ backgroundColor: 'rgba(161,29,48,0.04)' }}>
+                    <h5 className="text-sm font-semibold mb-3 flex items-center" style={{ color: '#6D1F27' }}>
                       <span className="text-xl mr-2">👤</span>
                       Informace o pacientovi
                     </h5>
@@ -318,8 +318,8 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
 
                 {/* Operační sál */}
                 {operation.operating_room && (
-                  <div className="bg-purple-50 rounded-lg p-4">
-                    <h5 className="text-sm font-semibold text-purple-900 mb-3 flex items-center">
+                  <div className="rounded-lg p-4" style={{ backgroundColor: 'rgba(161,29,48,0.08)' }}>
+                    <h5 className="text-sm font-semibold mb-3 flex items-center" style={{ color: '#6D1F27' }}>
                       <span className="text-xl mr-2">🏥</span>
                       Operační sál
                     </h5>
@@ -341,8 +341,8 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
                 )}
 
                 {/* Lékaři */}
-                <div className="bg-teal-50 rounded-lg p-4">
-                  <h5 className="text-sm font-semibold text-teal-900 mb-3 flex items-center">
+                <div className="rounded-lg p-4" style={{ backgroundColor: 'rgba(161,29,48,0.08)' }}>
+                  <h5 className="text-sm font-semibold mb-3 flex items-center" style={{ color: '#6D1F27' }}>
                     <span className="text-xl mr-2">👨‍⚕️</span>
                     Lékařský tým
                   </h5>
@@ -379,8 +379,8 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
 
                 {/* Poznámky */}
                 {operation.notes && (
-                  <div className="bg-yellow-50 rounded-lg p-4">
-                    <h5 className="text-sm font-semibold text-yellow-900 mb-2 flex items-center">
+                  <div className="rounded-lg p-4" style={{ backgroundColor: 'rgba(161,29,48,0.08)' }}>
+                    <h5 className="text-sm font-semibold mb-2 flex items-center" style={{ color: '#6D1F27' }}>
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
@@ -392,14 +392,14 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
 
                 {/* Urgentnost */}
                 {operation.is_emergency && (
-                  <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4">
+                  <div className="rounded-lg p-4" style={{ backgroundColor: 'rgba(161,29,48,0.08)', borderLeft: '4px solid #A11D30' }}>
                     <div className="flex items-center">
-                      <svg className="w-6 h-6 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#A11D30' }}>
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                       <div>
-                        <p className="text-sm font-semibold text-red-900">Urgentní operace</p>
-                        <p className="text-xs text-red-700">Tato operace vyžaduje prioritní ošetření</p>
+                        <p className="text-sm font-semibold text-black">Urgentní operace</p>
+                        <p className="text-xs text-black">Tato operace vyžaduje prioritní ošetření</p>
                       </div>
                     </div>
                   </div>
@@ -409,7 +409,7 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
           </div>
 
           {/* Footer */}
-          <div className="bg-gray-50 px-6 py-4 flex justify-between items-center">
+          <div className="px-6 py-4 flex justify-between items-center" style={{ backgroundColor: 'rgba(161,29,48,0.04)' }}>
             <div className="flex gap-3">
               {/* Admin může schválit nebo zamítnout operace čekající na schválení */}
               {isAdmin && operation && operation.status === 'pending_approval' && (
@@ -417,8 +417,9 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
                   <button
                     onClick={handleApproveOperation}
                     disabled={actionLoading}
-                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
+                    className="px-6 py-2 text-white rounded-lg transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    style={{ backgroundColor: '#A11D30' }}
+                   >
                     {actionLoading ? (
                       <>
                         <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -436,8 +437,9 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
                   <button
                     onClick={handleRejectOperation}
                     disabled={actionLoading}
-                    className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
+                    className="px-6 py-2 text-white rounded-lg transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    style={{ backgroundColor: '#A11D30' }}
+                   >
                     {actionLoading ? (
                       <>
                         <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -460,8 +462,9 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
                 <button
                   onClick={handleEditOperation}
                   disabled={actionLoading}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-                >
+                  className="px-6 py-2 text-white rounded-lg hover:opacity-95 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                  style={{ backgroundColor: '#A11D30' }}
+                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
@@ -472,13 +475,14 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
             
             <button
               onClick={onClose}
-              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
-            >
-              Zavřít
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+              className="px-6 py-2 text-white rounded-lg hover:opacity-95 transition-colors font-medium"
+              style={{ backgroundColor: '#A11D30' }}
+             >
+               Zavřít
+             </button>
+           </div>
+         </div>
+       </div>
+     </div>
+   );
+ }
