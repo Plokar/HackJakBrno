@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -6,10 +6,23 @@ import interactionPlugin from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
 import csLocale from '@fullcalendar/core/locales/cs';
 
+const DEFAULT_COLUMN_WIDTH = 150;
+const MAX_COLUMN_WIDTH = 260;
+
 export default function OperationCalendar({ operations = [], rooms = [], onEventClick, onDateSelect, onAddOperation }) {
   const calendarRef = useRef(null);
+  const calendarContainerRef = useRef(null);
+  const columnStyleRef = useRef(null);
   const [view, setView] = useState('timeGridWeek');
   const [selectedRoom, setSelectedRoom] = useState(null);
+  const [columnWidths, setColumnWidths] = useState({});
+  const [columnCount, setColumnCount] = useState(0);
+  const dragStateRef = useRef({
+    isDragging: false,
+    startX: 0,
+    startWidth: DEFAULT_COLUMN_WIDTH,
+    columnIndex: null
+  });
 
   console.log('OperationCalendar render:', { operationsCount: operations.length, roomsCount: rooms.length });
 
@@ -25,6 +38,122 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
   const filteredOperations = selectedRoom 
     ? operations.filter(op => op.room?.id === selectedRoom)
     : operations;
+
+  const getColumnWidth = (index) => columnWidths[index] || DEFAULT_COLUMN_WIDTH;
+  const resetColumnWidths = () => setColumnWidths({});
+
+  useEffect(() => {
+    const handlePointerMove = (event) => {
+      if (!dragStateRef.current.isDragging) return;
+      const delta = event.clientX - dragStateRef.current.startX;
+      const newWidth = Math.min(
+        MAX_COLUMN_WIDTH,
+        Math.max(DEFAULT_COLUMN_WIDTH, dragStateRef.current.startWidth + delta)
+      );
+      const columnIndex = dragStateRef.current.columnIndex;
+      if (columnIndex === null) return;
+      setColumnWidths((prev) => {
+        if (prev[columnIndex] === newWidth) return prev;
+        return { ...prev, [columnIndex]: newWidth };
+      });
+    };
+
+    const handlePointerUp = () => {
+      if (dragStateRef.current.isDragging) {
+        dragStateRef.current.isDragging = false;
+        dragStateRef.current.columnIndex = null;
+      }
+    };
+
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    const container = calendarContainerRef.current;
+    if (!container) return;
+
+    const headerCells = container.querySelectorAll('.fc-col-header-cell');
+    setColumnCount(headerCells.length);
+    const cleanups = [];
+
+    headerCells.forEach((cell, index) => {
+      cell.classList.add('calendar-header-resizable');
+
+      const ensureHandle = (position) => {
+        const className = `calendar-resize-handle-${position}`;
+        let handle = cell.querySelector(`.${className}`);
+        if (!handle) {
+          handle = document.createElement('div');
+          handle.classList.add('calendar-resize-handle', className);
+          cell.appendChild(handle);
+        }
+
+        const pointerDown = (event) => {
+          event.preventDefault();
+          dragStateRef.current.isDragging = true;
+          dragStateRef.current.startX = event.clientX;
+          dragStateRef.current.startWidth = getColumnWidth(index);
+          dragStateRef.current.columnIndex = index;
+        };
+
+        handle.addEventListener('pointerdown', pointerDown);
+        cleanups.push(() => handle.removeEventListener('pointerdown', pointerDown));
+      };
+
+      ensureHandle('left');
+      ensureHandle('right');
+    });
+
+    return () => {
+      cleanups.forEach((fn) => fn());
+    };
+  }, [view, columnWidths]);
+
+  useEffect(() => {
+    if (!columnStyleRef.current) {
+      const styleEl = document.createElement('style');
+      styleEl.setAttribute('data-calendar-column-widths', 'true');
+      document.head.appendChild(styleEl);
+      columnStyleRef.current = styleEl;
+    }
+
+    if (!columnCount) {
+      columnStyleRef.current.textContent = '';
+      return;
+    }
+
+    let css = '';
+    for (let i = 0; i < columnCount; i++) {
+      const width = getColumnWidth(i);
+      const nth = i + 1;
+      css += `
+        .calendar-container .fc .fc-col-header-cell:nth-child(${nth}),
+        .calendar-container .fc .fc-daygrid-body table tbody tr td:nth-child(${nth}),
+        .calendar-container .fc .fc-timegrid-cols .fc-timegrid-col:nth-child(${nth}) {
+          min-width: ${width}px;
+          width: ${width}px;
+          max-width: ${width}px;
+        }
+      `;
+    }
+
+    columnStyleRef.current.textContent = css;
+  }, [columnWidths, columnCount]);
+
+  useEffect(() => {
+    return () => {
+      if (columnStyleRef.current) {
+        columnStyleRef.current.remove();
+        columnStyleRef.current = null;
+      }
+    };
+  }, []);
 
   // Transform operations data for FullCalendar
   const events = filteredOperations.map(op => ({
@@ -82,16 +211,23 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     }
   };
 
+  const clampStyle = (lines) => ({
+    display: '-webkit-box',
+    WebkitLineClamp: lines,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden'
+  });
+
   const renderEventContent = (eventInfo) => {
     const roomName = eventInfo.event.extendedProps.room?.name || '';
     return (
-      <div className="p-1 leading-tight space-y-0.5">
-        <div className="font-semibold text-[11px] truncate">{eventInfo.timeText}</div>
-        <div className="text-[11px] font-medium break-words max-h-[2.4em] overflow-hidden">
+      <div className="p-1 leading-snug space-y-0.5 text-gray-900 text-[15px]">
+        <div className="font-semibold text-[15px] truncate">{eventInfo.timeText}</div>
+        <div className="font-semibold whitespace-normal break-words" style={clampStyle(2)}>
           {eventInfo.event.title}
         </div>
         {roomName && (
-          <div className="text-[10px] opacity-75 break-words max-h-[2.2em] overflow-hidden">
+          <div className="text-[14px] opacity-80 whitespace-normal break-words" style={clampStyle(2)}>
             {roomName}
           </div>
         )}
@@ -138,47 +274,60 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
         </div>
         
         {/* View Selector */}
-        <div className="flex space-x-2">
-          <button
-            onClick={() => handleViewChange('timeGridDay')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              view === 'timeGridDay'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Den
-          </button>
-          <button
-            onClick={() => handleViewChange('timeGridWeek')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              view === 'timeGridWeek'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Týden
-          </button>
-          <button
-            onClick={() => handleViewChange('dayGridMonth')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              view === 'dayGridMonth'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Měsíc
-          </button>
-          <button
-            onClick={() => handleViewChange('listWeek')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              view === 'listWeek'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Seznam
-          </button>
+        <div className="flex flex-col gap-3 w-full md:w-auto">
+          <div className="flex space-x-2">
+            <button
+              onClick={() => handleViewChange('timeGridDay')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                view === 'timeGridDay'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Den
+            </button>
+            <button
+              onClick={() => handleViewChange('timeGridWeek')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                view === 'timeGridWeek'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Týden
+            </button>
+            <button
+              onClick={() => handleViewChange('dayGridMonth')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                view === 'dayGridMonth'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Měsíc
+            </button>
+            <button
+              onClick={() => handleViewChange('listWeek')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                view === 'listWeek'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Seznam
+            </button>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <button
+              onClick={resetColumnWidths}
+              className="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              Reset šířek
+            </button>
+            <span className="text-xs text-gray-500">
+              Dvojité úchyty u každého dne umožňují ruční změnu
+            </span>
+          </div>
         </div>
       </div>
 
@@ -193,7 +342,10 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
       </div>
 
       {/* Calendar */}
-      <div className="calendar-container">
+      <div
+        ref={calendarContainerRef}
+        className="calendar-container overflow-x-auto"
+      >
         <FullCalendar
           ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
@@ -267,15 +419,54 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
           background-color: #1d4ed8 !important;
           border-color: #1d4ed8 !important;
         }
+        .calendar-container .calendar-header-resizable {
+          position: relative;
+        }
+        .calendar-container .calendar-resize-handle {
+          position: absolute;
+          top: 0;
+          width: 8px;
+          height: 100%;
+          cursor: col-resize;
+          z-index: 5;
+        }
+        .calendar-container .calendar-resize-handle-left {
+          left: -3px;
+        }
+        .calendar-container .calendar-resize-handle-right {
+          right: -3px;
+        }
+        .calendar-container .calendar-resize-handle:hover,
+        .calendar-container .calendar-resize-handle:active {
+          background-color: rgba(59, 130, 246, 0.2);
+        }
+        .calendar-container .fc-col-header-cell-cushion {
+          font-size: 0.95rem;
+          font-weight: 500;
+        }
+        .calendar-container .fc-daygrid-day-number,
+        .calendar-container .fc-timegrid-slot-label-cushion {
+          font-size: 0.9rem;
+          font-weight: 500;
+        }
         .calendar-container .fc-event {
           cursor: pointer;
           border-radius: 4px;
+          overflow: hidden;
         }
         .calendar-container .fc-event:hover {
           opacity: 0.8;
         }
         .calendar-container .fc-daygrid-event {
           margin: 1px 2px;
+        }
+        .calendar-container .fc .fc-daygrid,
+        .calendar-container .fc .fc-daygrid table {
+          table-layout: auto !important;
+          width: auto !important;
+        }
+        .calendar-container .fc .fc-daygrid-body table tbody tr td {
+          width: auto !important;
         }
       `}</style>
     </div>
