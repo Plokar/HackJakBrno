@@ -62,27 +62,35 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
     const configs = {
       available: {
         label: 'Volný',
-        bgColor: 'bg-green-100',
-        textColor: 'text-green-800',
-        borderColor: 'border-green-400'
+        bgColor: 'bg-[#EAEAEA]',
+        textColor: 'text-gray-800',
+        borderColor: 'border-gray-400',
+        badgeBgColor: 'bg-[#666666]',
+        badgeBorderColor: 'border-[#666666]'
       },
       active: {
         label: 'V provozu',
         bgColor: 'bg-[#fce7ed]',
-        textColor: 'text-[#C21533]',
-        borderColor: 'border-[#C21533]'
+        textColor: 'text-[#E00034]',
+        borderColor: 'border-[#E00034]',
+        badgeBgColor: 'bg-[#E00034]',
+        badgeBorderColor: 'border-[#E00034]'
       },
       cleaning: {
         label: 'Úklid',
         bgColor: 'bg-purple-100',
         textColor: 'text-purple-800',
-        borderColor: 'border-purple-400'
+        borderColor: 'border-purple-400',
+        badgeBgColor: 'bg-purple-600',
+        badgeBorderColor: 'border-purple-600'
       },
       maintenance: {
         label: 'Údržba',
         bgColor: 'bg-yellow-100',
         textColor: 'text-yellow-800',
-        borderColor: 'border-yellow-400'
+        borderColor: 'border-yellow-400',
+        badgeBgColor: 'bg-yellow-600',
+        badgeBorderColor: 'border-yellow-600'
       }
     };
     return configs[status] || configs.available;
@@ -199,7 +207,7 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
                   
                   {roomDetail && (
                     <div className="mt-3">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusConfig.bgColor} ${statusConfig.textColor}`}>
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border-2 text-white ${statusConfig.badgeBgColor} ${statusConfig.badgeBorderColor}`}>
                         {statusConfig.label}
                       </span>
                     </div>
@@ -228,8 +236,8 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
                     <div className="space-y-6">
                       {/* Current Operation Section */}
                       {roomDetail.currentOperation ? (
-                        <div className="border-2 border-[#C21533] rounded-lg p-5 bg-[#fce7ed]">
-                          <h3 className="text-lg font-bold text-[#C21533] mb-4 flex items-center">
+                        <div className="border-2 rounded-lg p-5 bg-[#fce7ed]" style={{ borderColor: '#E00034' }}>
+                          <h3 className="text-lg font-bold mb-4 flex items-center" style={{ color: '#E00034' }}>
                             <ClockIcon className="h-5 w-5 mr-2" />
                             Probíhající operace
                           </h3>
@@ -274,7 +282,7 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
 
                           {/* Assisting Doctors */}
                           {roomDetail.currentOperation.assisting_doctors && roomDetail.currentOperation.assisting_doctors.length > 0 && (
-                            <div className="mt-4 pt-4 border-t border-[#C21533] border-opacity-30">
+                            <div className="mt-4 pt-4 border-t border-opacity-30" style={{ borderColor: '#E00034' }}>
                               <h4 className="text-sm font-semibold text-gray-700 mb-2">Asistující lékaři:</h4>
                               <div className="flex flex-wrap gap-2">
                                 {roomDetail.currentOperation.assisting_doctors.map((doctor, idx) => (
@@ -291,7 +299,7 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
 
                           {/* Notes */}
                           {roomDetail.currentOperation.notes && (
-                            <div className="mt-4 pt-4 border-t border-[#C21533] border-opacity-30">
+                            <div className="mt-4 pt-4 border-t border-opacity-30" style={{ borderColor: '#E00034' }}>
                               <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
                                 <DocumentTextIcon className="h-4 w-4 mr-1" />
                                 Poznámky:
@@ -303,10 +311,10 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
                           )}
                         </div>
                       ) : (
-                        <div className="text-center py-8 bg-green-50 rounded-lg border-2 border-green-200">
-                          <CheckCircleIcon className="h-16 w-16 text-green-600 mx-auto mb-3" />
-                          <h3 className="text-lg font-semibold text-green-800">Sál je momentálně volný</h3>
-                          <p className="text-sm text-green-600 mt-2">Žádná operace právě neprobíhá</p>
+                        <div className="text-center py-8 rounded-lg border-2" style={{ backgroundColor: '#EAEAEA', borderColor: '#666666' }}>
+                          <CheckCircleIcon className="h-16 w-16 mx-auto mb-3" style={{ color: '#666666' }} />
+                          <h3 className="text-lg font-semibold text-gray-800">Sál je momentálně volný</h3>
+                          <p className="text-sm text-gray-700 mt-2">Žádná operace právě neprobíhá</p>
                         </div>
                       )}
 

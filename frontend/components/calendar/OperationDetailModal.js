@@ -178,7 +178,7 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
         {/* Modal panel */}
         <div className="inline-block w-full max-w-4xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white rounded-lg shadow-xl">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-4">
+          <div className="px-6 py-4" style={{ backgroundColor: '#E00034' }}>
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-bold text-white flex items-center">
                 <span className="text-2xl mr-3">⚕️</span>
