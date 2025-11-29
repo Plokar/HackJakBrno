@@ -21,8 +21,7 @@ export default function Home() {
 
   const fetchDashboardData = async () => {
     try {
-      // Použít proxy endpoint
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const url = apiUrl.startsWith('/api/proxy') 
         ? '/api/proxy/medic/dashboard/stats/'
         : `${apiUrl}/medic/dashboard/stats/`;

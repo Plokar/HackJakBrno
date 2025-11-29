@@ -4,7 +4,7 @@
  */
 
 // V Dockeru používáme Next.js proxy
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 class ApiClient {
   constructor() {
@@ -127,7 +127,7 @@ class ApiClient {
    * Dashboard API
    */
   dashboard = {
-    getStats: () => this.get('/api/medic/dashboard/stats/'),
+    getStats: () => this.get('/medic/dashboard/stats/'),
   };
 
   /**
@@ -146,93 +146,93 @@ class ApiClient {
    * Operations API
    */
   operations = {
-    list: (params = {}) => this.get('/api/medic/operations/', params),
-    get: (id) => this.get(`/api/medic/operations/${id}/`),
-    create: (data) => this.post('/api/medic/operations/', data),
-    update: (id, data) => this.patch(`/api/medic/operations/${id}/`, data),
-    delete: (id) => this.delete(`/api/medic/operations/${id}/`),
+    list: (params = {}) => this.get('/medic/operations/', params),
+    get: (id) => this.get(`/medic/operations/${id}/`),
+    create: (data) => this.post('/medic/operations/', data),
+    update: (id, data) => this.patch(`/medic/operations/${id}/`, data),
+    delete: (id) => this.delete(`/medic/operations/${id}/`),
     
     // Speciální endpointy
-    today: () => this.get('/api/medic/operations/today/'),
-    active: () => this.get('/api/medic/operations/active/'),
-    start: (id) => this.post(`/api/medic/operations/${id}/start/`, {}),
-    complete: (id) => this.post(`/api/medic/operations/${id}/complete/`, {}),
+    today: () => this.get('/medic/operations/today/'),
+    active: () => this.get('/medic/operations/active/'),
+    start: (id) => this.post(`/medic/operations/${id}/start/`, {}),
+    complete: (id) => this.post(`/medic/operations/${id}/complete/`, {}),
     
     // Workflow actions
-    submitForApproval: (id) => this.post(`/api/medic/operations/${id}/submit-for-approval/`, {}),
+    submitForApproval: (id) => this.post(`/medic/operations/${id}/submit-for-approval/`, {}),
     approve: (id, approved = true, notes = '') => 
-      this.post(`/api/medic/operations/${id}/approve/`, { approved, notes }),
-    assignStaff: (id, data) => this.post(`/api/medic/operations/${id}/assign-staff/`, data),
+      this.post(`/medic/operations/${id}/approve/`, { approved, notes }),
+    assignStaff: (id, data) => this.post(`/medic/operations/${id}/assign-staff/`, data),
   };
 
   /**
    * Patients API
    */
   patients = {
-    list: (params = {}) => this.get('/api/medic/patients/', params),
-    get: (id) => this.get(`/api/medic/patients/${id}/`),
-    create: (data) => this.post('/api/medic/patients/', data),
-    update: (id, data) => this.put(`/api/medic/patients/${id}/`, data),
-    delete: (id) => this.delete(`/api/medic/patients/${id}/`),
-    getOperations: (id) => this.get(`/api/medic/patients/${id}/operations/`),
-    searchByBirthNumber: (birthNumber) => this.get('/api/medic/patients/search_by_birth_number/', { birth_number: birthNumber }),
+    list: (params = {}) => this.get('/medic/patients/', params),
+    get: (id) => this.get(`/medic/patients/${id}/`),
+    create: (data) => this.post('/medic/patients/', data),
+    update: (id, data) => this.put(`/medic/patients/${id}/`, data),
+    delete: (id) => this.delete(`/medic/patients/${id}/`),
+    getOperations: (id) => this.get(`/medic/patients/${id}/operations/`),
+    searchByBirthNumber: (birthNumber) => this.get('/medic/patients/search_by_birth_number/', { birth_number: birthNumber }),
   };
 
   /**
    * Doctors API
    */
   doctors = {
-    list: (params = {}) => this.get('/api/medic/doctors/', params),
-    get: (id) => this.get(`/api/medic/doctors/${id}/`),
-    create: (data) => this.post('/api/medic/doctors/', data),
-    update: (id, data) => this.put(`/api/medic/doctors/${id}/`, data),
-    delete: (id) => this.delete(`/api/medic/doctors/${id}/`),
+    list: (params = {}) => this.get('/medic/doctors/', params),
+    get: (id) => this.get(`/medic/doctors/${id}/`),
+    create: (data) => this.post('/medic/doctors/', data),
+    update: (id, data) => this.put(`/medic/doctors/${id}/`, data),
+    delete: (id) => this.delete(`/medic/doctors/${id}/`),
     getSchedule: (id, date = null) => 
-      this.get(`/api/medic/doctors/${id}/schedule/`, date ? { date } : {}),
+      this.get(`/medic/doctors/${id}/schedule/`, date ? { date } : {}),
   };
 
   /**
    * Equipment API
    */
   equipment = {
-    list: (params = {}) => this.get('/api/medic/equipment/', params),
-    get: (id) => this.get(`/api/medic/equipment/${id}/`),
-    create: (data) => this.post('/api/medic/equipment/', data),
-    update: (id, data) => this.put(`/api/medic/equipment/${id}/`, data),
-    delete: (id) => this.delete(`/api/medic/equipment/${id}/`),
+    list: (params = {}) => this.get('/medic/equipment/', params),
+    get: (id) => this.get(`/medic/equipment/${id}/`),
+    create: (data) => this.post('/medic/equipment/', data),
+    update: (id, data) => this.put(`/medic/equipment/${id}/`, data),
+    delete: (id) => this.delete(`/medic/equipment/${id}/`),
     getLowLifetime: (threshold = 20) => 
-      this.get('/api/medic/equipment/low_lifetime/', { threshold }),
+      this.get('/medic/equipment/low_lifetime/', { threshold }),
   };
 
   /**
    * Materials API
    */
   materials = {
-    list: (params = {}) => this.get('/api/medic/materials/', params),
-    get: (id) => this.get(`/api/medic/materials/${id}/`),
-    create: (data) => this.post('/api/medic/materials/', data),
-    update: (id, data) => this.put(`/api/medic/materials/${id}/`, data),
-    delete: (id) => this.delete(`/api/medic/materials/${id}/`),
-    getLowStock: () => this.get('/api/medic/materials/low_stock/'),
-    scan: (eanCode) => this.post('/api/medic/materials/scan/', { ean_code: eanCode }),
+    list: (params = {}) => this.get('/medic/materials/', params),
+    get: (id) => this.get(`/medic/materials/${id}/`),
+    create: (data) => this.post('/medic/materials/', data),
+    update: (id, data) => this.put(`/medic/materials/${id}/`, data),
+    delete: (id) => this.delete(`/medic/materials/${id}/`),
+    getLowStock: () => this.get('/medic/materials/low_stock/'),
+    scan: (eanCode) => this.post('/medic/materials/scan/', { ean_code: eanCode }),
   };
 
   /**
    * Perioperative Protocols API
    */
   protocols = {
-    list: (params = {}) => this.get('/api/medic/protocols/', params),
-    get: (id) => this.get(`/api/medic/protocols/${id}/`),
-    create: (data) => this.post('/api/medic/protocols/', data),
-    update: (id, data) => this.put(`/api/medic/protocols/${id}/`, data),
-    delete: (id) => this.delete(`/api/medic/protocols/${id}/`),
+    list: (params = {}) => this.get('/medic/protocols/', params),
+    get: (id) => this.get(`/medic/protocols/${id}/`),
+    create: (data) => this.post('/medic/protocols/', data),
+    update: (id, data) => this.put(`/medic/protocols/${id}/`, data),
+    delete: (id) => this.delete(`/medic/protocols/${id}/`),
     addEquipment: (id, equipmentId, hoursUsed) => 
-      this.post(`/api/medic/protocols/${id}/add_equipment/`, { 
+      this.post(`/medic/protocols/${id}/add_equipment/`, { 
         equipment_id: equipmentId, 
         hours_used: hoursUsed 
       }),
     addMaterial: (id, materialId, quantityUsed) => 
-      this.post(`/api/medic/protocols/${id}/add_material/`, { 
+      this.post(`/medic/protocols/${id}/add_material/`, { 
         material_id: materialId, 
         quantity_used: quantityUsed 
       }),
