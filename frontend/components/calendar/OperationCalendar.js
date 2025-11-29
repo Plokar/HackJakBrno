@@ -11,6 +11,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
   const MAX_COLUMN_WIDTH = 260;
   // výchozí šířka pro měsíční zobrazení (nastaveno na 165px)
   const DEFAULT_MONTH_COLUMN_WIDTH = 165;
+  // stripEmojis removed from here — using module-level function
   const calendarRef = useRef(null);
   const calendarContainerRef = useRef(null);
   const columnStyleRef = useRef(null);
@@ -20,6 +21,14 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
   const isDoctor = currentRole === 'doctor';
   const [columnWidths, setColumnWidths] = useState({});
   const [columnCount, setColumnCount] = useState(0);
+  const [dismissedOperations, setDismissedOperations] = useState(() => {
+    // Load dismissed operations from localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dismissedOperations');
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
   const dragStateRef = useRef({
     isDragging: false,
     startX: 0,
@@ -60,10 +69,11 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     }
   };
 
-  // Filter operations by selected room
-  const filteredOperations = selectedRoom 
+  // Filter operations by selected room and dismissed operations
+  const filteredOperations = (selectedRoom 
     ? operations.filter(op => op.room?.id === selectedRoom)
-    : operations;
+    : operations
+  ).filter(op => !dismissedOperations.includes(op.id));
 
   const getColumnWidth = useCallback((index) => {
     // v měsíčním zobrazení použijeme větší výchozí šířku
@@ -284,6 +294,20 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     };
   }, []);
 
+  // Refresh calendar when dismissed operations change
+  useEffect(() => {
+    if (calendarRef.current) {
+      const calendarApi = calendarRef.current.getApi();
+      // Remove all events that are in dismissedOperations
+      dismissedOperations.forEach(dismissedId => {
+        const event = calendarApi.getEventById(String(dismissedId));
+        if (event) {
+          event.remove();
+        }
+      });
+    }
+  }, [dismissedOperations]);
+
   // Transform operations data for FullCalendar
   const events = filteredOperations.map(op => {
     const isHighlighted = highlightedOperationId && op.id === highlightedOperationId;
@@ -294,9 +318,13 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     if (isPast && op.status !== 'completed' && op.status !== 'cancelled') {
       className += ' past-operation';
     }
+    // Přidat třídu pro zrušené operace
+    if (op.status === 'cancelled') {
+      className += ' cancelled-operation';
+    }
     
     return {
-      id: op.id,
+      id: String(op.id),
       title: `${op.type} - ${op.patient?.name || 'Pacient'}`,
       start: op.scheduledStart,
       end: op.scheduledEnd,
@@ -370,30 +398,76 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     overflow: 'hidden'
   });
 
-  const renderEventContent = (eventInfo) => {
-    const roomName = eventInfo.event.extendedProps.room?.name || '';
-    const isHighlighted = eventInfo.event.extendedProps.isHighlighted;
-    const isPast = eventInfo.event.extendedProps.isPast;
-    const status = eventInfo.event.extendedProps.status;
+  const handleDismissOperation = (operationId, e) => {
+    e.stopPropagation(); // Prevent event click from firing
+    // operationId from event.id is a string, but we need to store the numeric ID
+    const numericId = typeof operationId === 'string' ? parseInt(operationId, 10) : operationId;
+    const newDismissed = [...dismissedOperations, numericId];
+    setDismissedOperations(newDismissed);
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dismissedOperations', JSON.stringify(newDismissed));
+    }
+    // Immediately remove the event from the calendar
+    if (calendarRef.current) {
+      const calendarApi = calendarRef.current.getApi();
+      const event = calendarApi.getEventById(String(operationId));
+      if (event) {
+        event.remove();
+      }
+    }
+  };
+
+  const renderEventContent = (arg) => {
+    // sanitize title + other text parts to remove emojis
+    const title = stripEmojis(arg.event.title || '');
+    const roomName = arg.event.extendedProps.room?.name || '';
+    const isHighlighted = arg.event.extendedProps.isHighlighted;
+    const isPast = arg.event.extendedProps.isPast;
+    const status = arg.event.extendedProps.status;
+    const operationId = arg.event.id;
     
     // Status emoji
     let statusEmoji = '';
     if (status === 'completed') statusEmoji = '✅';
     else if (status === 'in_progress') statusEmoji = '⏱️';
-    else if (status === 'cancelled') statusEmoji = '❌';
-    else if (isPast && status !== 'completed') statusEmoji = '⚠️';
+    // Removed ❌ emoji for cancelled operations
+    else if (isPast && status !== 'completed' && status !== 'cancelled') statusEmoji = '⚠️';
+
+    
+    const isCancelled = status === 'cancelled';
+    const paddingClass = isCancelled ? 'p-0.5' : 'p-1';
+    const textSizeClass = isCancelled ? 'text-[11px]' : 'text-[15px]';
+    const titleSizeClass = isCancelled ? 'text-[11px]' : 'text-[15px]';
     
     return (
-      <div className={`p-1 leading-snug space-y-0.5 text-[15px] ${isHighlighted ? 'text-white animate-pulse' : 'text-gray-900'} ${isPast && status !== 'completed' ? 'opacity-60' : ''}`}>
-        <div className="font-semibold text-[15px] truncate">
-          {eventInfo.timeText} {statusEmoji}
+      <div className={`${paddingClass} leading-snug space-y-0.5 ${textSizeClass} ${isHighlighted ? 'text-white animate-pulse' : 'text-gray-900'} ${isPast && status !== 'completed' ? 'opacity-60' : ''} relative`}>
+        {isCancelled && (
+          <button
+            onClick={(e) => handleDismissOperation(operationId, e)}
+            className="absolute top-0 right-0 m-0.5 p-0.5 rounded hover:bg-black/20 transition-colors"
+            title="Skrýt operaci"
+            aria-label="Skrýt operaci"
+          >
+            <svg 
+              className={`${isCancelled ? 'w-3 h-3' : 'w-4 h-4'} text-[#E00034]`}
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+        <div className={`font-semibold ${titleSizeClass} truncate ${isCancelled ? 'pr-4' : ''}`}>
+          {arg.timeText} {statusEmoji}
         </div>
-        <div className="font-semibold whitespace-normal break-words" style={clampStyle(2)}>
-          {eventInfo.event.title}
+        <div className={`font-semibold whitespace-normal break-words ${isCancelled ? 'text-[10px]' : ''}`} style={clampStyle(isCancelled ? 1 : 2)}>
+          {title}
           {isHighlighted && ' 📍'}
         </div>
         {roomName && (
-          <div className="text-[14px] opacity-80 whitespace-normal break-words" style={clampStyle(2)}>
+          <div className={`${isCancelled ? 'text-[9px]' : 'text-[14px]'} opacity-80 whitespace-normal break-words`} style={clampStyle(isCancelled ? 1 : 2)}>
             {roomName}
           </div>
         )}
@@ -406,7 +480,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div className="flex items-center gap-4 flex-1">
           <h2 className="text-2xl font-bold text-gray-900">Harmonogram operací</h2>
-          
+
           {/* Room Selector */}
           <div className="flex items-center gap-2">
             <label htmlFor="room-select" className="text-sm font-medium text-gray-700">
@@ -420,7 +494,14 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
                 console.log(`[Calendar] Room selection changed: ${selectedRoom} -> ${newRoom}`);
                 setSelectedRoom(newRoom);
               }}
-              className="w-48 px-3 py-2 pr-8 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#C21533] focus:border-transparent"
+              className="w-48 pl-3 pr-10 py-2 border-2 rounded-lg text-sm appearance-none bg-white"
+              style={{ 
+                borderColor: '#E00034',
+                backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")", 
+                backgroundPosition: 'right 0.5rem center', 
+                backgroundRepeat: 'no-repeat', 
+                backgroundSize: '1.5em 1.5em'
+              }}
             >
               <option value="">Všechny sály</option>
               {rooms.map(room => (
@@ -495,27 +576,15 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
       {/* Legend */}
       <div className="flex flex-wrap gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
         <div className="w-full mb-2">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Status operací:</h3>
-          <div className="flex flex-wrap gap-4">
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Legenda</h3>
+          <div className="flex flex-wrap gap-4 items-center">
             <LegendItem color="#fb923c" label="Čeká na schválení" />
-            <LegendItem color="#fbbf24" label="Čeká na personál" />
             <LegendItem color="#8b5cf6" label="Naplánováno" />
-            <LegendItem color="#3b82f6" label="⏱️ Probíhá" />
-            <LegendItem color="#10b981" label="✅ Dokončeno" />
-            <LegendItem color="#6b7280" label="❌ Zrušeno" />
-          </div>
-        </div>
-        <div className="w-full border-t border-gray-300 my-1"></div>
-        <div className="w-full">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Priorita:</h3>
-          <div className="flex flex-wrap gap-4">
+            <LegendItem color="#3b82f6" label="Probíhá" />
+            <LegendItem color="#10b981" label="Dokončeno" />
             <LegendItem color="#dc2626" label="Urgentní" />
-            <LegendItem color="#f59e0b" label="Vysoká priorita" />
+            <LegendItem color="#6b7280" label="Zrušené" />
           </div>
-        </div>
-        <div className="w-full border-t border-gray-300 my-1"></div>
-        <div className="text-xs text-gray-600">
-          ⚠️ Operace v minulosti (neukončené) jsou zobrazeny šedě
         </div>
       </div>
 
@@ -525,6 +594,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
         className="calendar-container overflow-x-auto"
       >
         <FullCalendar
+          key={`calendar-${dismissedOperations.length}`}
           ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
           initialView={view}
@@ -537,8 +607,8 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
           events={events}
           eventClick={handleEventClick}
           select={handleDateSelect}
-          selectable={true}
-          selectMirror={true}
+          selectable={currentRole === 'doctor'}
+          selectMirror={currentRole === 'doctor'}
           dayMaxEvents={true}
           weekends={true}
           slotMinTime="00:00:00"
@@ -566,7 +636,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
         <StatCard
           label="Probíhající"
           value={filteredOperations.filter(op => op.status === 'in_progress').length}
-          color="blue"
+          color="green"
         />
         <StatCard
           label="Naplánováno"
@@ -576,7 +646,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
         <StatCard
           label="Dokončeno"
           value={filteredOperations.filter(op => op.status === 'completed').length}
-          color="green"
+          color="gray"
         />
       </div>
 
@@ -657,6 +727,22 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
         .calendar-container .fc-daygrid-event {
           margin: 1px 2px;
         }
+        /* Make cancelled operations smaller */
+        .calendar-container .fc-event.cancelled-operation {
+          min-height: 20px !important;
+          height: auto !important;
+          font-size: 11px !important;
+        }
+        .calendar-container .fc-event.cancelled-operation .fc-event-main {
+          padding: 2px 4px !important;
+        }
+        .calendar-container .fc-timegrid-event.cancelled-operation {
+          min-height: 20px !important;
+          font-size: 11px !important;
+        }
+        .calendar-container .fc-timegrid-event.cancelled-operation .fc-event-main {
+          padding: 2px 4px !important;
+        }
         .calendar-container .fc .fc-daygrid,
         .calendar-container .fc .fc-daygrid table {
           table-layout: auto !important;
@@ -668,14 +754,17 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
   );
 }
 
+// helper: remove emoji characters from a string
+function stripEmojis(text) {
+  if (typeof text !== 'string') return text;
+  return text.replace(/[\u{1F300}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
+}
+
 function LegendItem({ color, label }) {
   return (
-    <div className="flex items-center">
-      <div
-        className="w-4 h-4 rounded mr-2"
-        style={{ backgroundColor: color }}
-      ></div>
-      <span className="text-sm text-gray-700">{label}</span>
+    <div className="flex items-center gap-2">
+      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+      <span className="text-sm text-gray-700">{stripEmojis(label)}</span>
     </div>
   );
 }
@@ -686,6 +775,12 @@ function StatCard({ label, value, color }) {
     green: 'bg-green-50 text-green-700',
     purple: 'bg-purple-50 text-purple-700',
     red: 'bg-red-50 text-red-700',
+    gray: 'bg-gray-50 text-gray-700',
+    // Custom colors - lighter shades
+    'custom-red-1': 'bg-[#E00034]/20 text-black',
+    'custom-red-2': 'bg-[#E00034]/20 text-black',
+    'custom-red-3': 'bg-[#E00034]/20 text-black',
+    'custom-red-4': 'bg-[#E00034]/20 text-black',
   };
 
   return (

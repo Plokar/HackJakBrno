@@ -89,16 +89,39 @@ class OperationCreateSerializer(serializers.Serializer):
     is_emergency = serializers.BooleanField(default=False)
     notes = serializers.CharField(required=False, allow_blank=True)
     
-    # Patient fields
-    patient_first_name = serializers.CharField(max_length=100)
-    patient_last_name = serializers.CharField(max_length=100)
-    patient_birth_number = serializers.CharField(max_length=20)
-    patient_date_of_birth = serializers.DateField()
-    patient_diagnosis = serializers.CharField()
+    # Patient - buď ID existujícího pacienta nebo údaje pro vytvoření nového
+    patient_id = serializers.IntegerField(required=False, allow_null=True)
+    patient_first_name = serializers.CharField(max_length=100, required=False)
+    patient_last_name = serializers.CharField(max_length=100, required=False)
+    patient_birth_number = serializers.CharField(max_length=20, required=False)
+    patient_date_of_birth = serializers.DateField(required=False)
+    patient_diagnosis = serializers.CharField(required=False)
     patient_medical_history = serializers.CharField(required=False, allow_blank=True)
     
     def validate(self, data):
         # Validace pouze pokud jsou pole vyplněna
+        
+        # Validate patient - buď patient_id nebo všechny povinné údaje o pacientovi
+        has_patient_id = data.get('patient_id') is not None
+        has_patient_data = all([
+            data.get('patient_first_name'),
+            data.get('patient_last_name'),
+            data.get('patient_birth_number'),
+            data.get('patient_date_of_birth'),
+            data.get('patient_diagnosis')
+        ])
+        
+        if not has_patient_id and not has_patient_data:
+            raise serializers.ValidationError({
+                'patient': 'Musíte zadat buď ID existujícího pacienta, nebo všechny údaje pro vytvoření nového pacienta'
+            })
+        
+        # Validate that patient exists (pokud je zadán patient_id)
+        if has_patient_id:
+            if not Patient.objects.filter(id=data['patient_id']).exists():
+                raise serializers.ValidationError({
+                    'patient_id': 'Pacient s tímto ID neexistuje'
+                })
         
         # Validate that end time is after start time (pokud jsou obě vyplněna)
         if data.get('scheduled_end') and data.get('scheduled_start'):
@@ -124,24 +147,29 @@ class OperationCreateSerializer(serializers.Serializer):
         return data
     
     def create(self, validated_data):
-        # Create or get patient
-        patient, created = Patient.objects.get_or_create(
-            birth_number=validated_data['patient_birth_number'],
-            defaults={
-                'first_name': validated_data['patient_first_name'],
-                'last_name': validated_data['patient_last_name'],
-                'date_of_birth': validated_data['patient_date_of_birth'],
-                'diagnosis': validated_data['patient_diagnosis'],
-                'medical_history': validated_data.get('patient_medical_history', ''),
-            }
-        )
-        
-        # If patient exists, update their diagnosis and medical history
-        if not created:
-            patient.diagnosis = validated_data['patient_diagnosis']
-            if validated_data.get('patient_medical_history'):
-                patient.medical_history = validated_data['patient_medical_history']
-            patient.save()
+        # Získat nebo vytvořit pacienta
+        if validated_data.get('patient_id'):
+            # Použít existujícího pacienta podle ID
+            patient = Patient.objects.get(id=validated_data['patient_id'])
+        else:
+            # Vytvořit nebo získat pacienta podle rodného čísla
+            patient, created = Patient.objects.get_or_create(
+                birth_number=validated_data['patient_birth_number'],
+                defaults={
+                    'first_name': validated_data['patient_first_name'],
+                    'last_name': validated_data['patient_last_name'],
+                    'date_of_birth': validated_data['patient_date_of_birth'],
+                    'diagnosis': validated_data['patient_diagnosis'],
+                    'medical_history': validated_data.get('patient_medical_history', ''),
+                }
+            )
+            
+            # Pokud pacient existuje, aktualizovat jeho diagnózu a zdravotní historii
+            if not created:
+                patient.diagnosis = validated_data['patient_diagnosis']
+                if validated_data.get('patient_medical_history'):
+                    patient.medical_history = validated_data['patient_medical_history']
+                patient.save()
         
         # Get request user from context
         request = self.context.get('request')

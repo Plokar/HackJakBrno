@@ -22,7 +22,7 @@ export default function DoctorProfile({ doctor, onClose }) {
   return (
     <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 text-white">
+      <div className="p-6 text-white" style={{ background: 'linear-gradient(to right, #E00034, #6D1F27)' }}>
         <div className="flex justify-between items-start">
           <div className="flex items-center space-x-4">
             <div className="bg-white bg-opacity-20 rounded-full p-3">
@@ -30,7 +30,7 @@ export default function DoctorProfile({ doctor, onClose }) {
             </div>
             <div>
               <h2 className="text-2xl font-bold">{doctor.name}</h2>
-              <p className="text-blue-100">{doctor.specialization}</p>
+              <p className="text-white opacity-90">{doctor.specialization}</p>
               <div className="flex items-center mt-2 space-x-4">
                 <span className="text-sm bg-white bg-opacity-20 px-3 py-1 rounded-full">
                   {doctor.certifications?.length || 0} certifikace
@@ -62,7 +62,7 @@ export default function DoctorProfile({ doctor, onClose }) {
                 className={classNames(
                   'flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                   activeTab === tab.id
-                    ? 'bg-blue-100 text-blue-700'
+                    ? 'bg-[#fce7ed] text-[#E00034]'
                     : 'text-gray-600 hover:bg-gray-100'
                 )}
               >

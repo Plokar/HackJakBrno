@@ -37,8 +37,12 @@ export default function PatientList({ patients = [], onPatientClick }) {
 
   const getStatusBadge = (status) => {
     const config = {
-      scheduled: { label: 'Naplánováno', color: 'bg-blue-100 text-blue-800' },
+      scheduled: { label: 'Naplánováno', color: 'bg-purple-100 text-purple-800' },
+      pending_approval: { label: 'Čeká na schválení', color: 'bg-orange-100 text-orange-800' },
+      in_progress: { label: 'Probíhá', color: 'bg-blue-100 text-blue-800' },
       in_operation: { label: 'V operaci', color: 'bg-green-100 text-green-800' },
+      completed: { label: 'Dokončeno', color: 'bg-green-100 text-green-800' },
+      urgent: { label: 'Urgentní', color: 'bg-red-100 text-red-800' },
       post_op: { label: 'Po operaci', color: 'bg-yellow-100 text-yellow-800' },
       discharged: { label: 'Propuštěn', color: 'bg-gray-100 text-gray-800' },
     };
@@ -77,10 +81,22 @@ export default function PatientList({ patients = [], onPatientClick }) {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="pl-4 pr-10 py-2 border-2 rounded-lg appearance-none bg-white focus:ring-2 focus:border-transparent"
+            style={{ 
+              borderColor: '#E00034',
+              '--tw-ring-color': '#E00034',
+              backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")", 
+              backgroundPosition: 'right 0.5rem center', 
+              backgroundRepeat: 'no-repeat', 
+              backgroundSize: '1.5em 1.5em'
+            }}
           >
             <option value="all">Všechny stavy</option>
             <option value="scheduled">Naplánováno</option>
+            <option value="pending_approval">Čeká na schválení</option>
+            <option value="in_progress">Probíhá</option>
+            <option value="completed">Dokončeno</option>
+            <option value="urgent">Urgentní</option>
             <option value="in_operation">V operaci</option>
             <option value="post_op">Po operaci</option>
             <option value="discharged">Propuštěni</option>

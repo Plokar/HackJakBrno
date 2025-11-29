@@ -149,7 +149,7 @@ class ApiClient {
     list: (params = {}) => this.get('/api/medic/operations/', params),
     get: (id) => this.get(`/api/medic/operations/${id}/`),
     create: (data) => this.post('/api/medic/operations/', data),
-    update: (id, data) => this.put(`/api/medic/operations/${id}/`, data),
+    update: (id, data) => this.patch(`/api/medic/operations/${id}/`, data),
     delete: (id) => this.delete(`/api/medic/operations/${id}/`),
     
     // Speciální endpointy

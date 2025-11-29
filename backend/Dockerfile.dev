@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     postgresql-client \
     netcat-traditional \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements-dev.txt /code/
@@ -19,28 +20,13 @@ RUN pip install --upgrade pip && \
     pip install -r requirements.txt && \
     pip install -r requirements-dev.txt
 
-# Vytvořit entrypoint script v /usr/local/bin (mimo volume mount)
-RUN printf '#!/bin/sh\n\
-set -e\n\
-echo "Starting Django application..."\n\
-echo "Waiting for PostgreSQL..."\n\
-while ! nc -z $POSTGRES_HOST $POSTGRES_PORT; do\n\
-  sleep 0.1\n\
-done\n\
-echo "PostgreSQL started"\n\
-cd /code\n\
-echo "Running database migrations..."\n\
-python manage.py migrate --noinput\n\
-if [ "$DJANGO_DEBUG" = "True" ]; then\n\
-  echo "Starting development server..."\n\
-  python manage.py runserver 0.0.0.0:8000\n\
-else\n\
-  echo "Starting production server with Gunicorn..."\n\
-  gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4\n\
-fi\n' > /usr/local/bin/docker-entrypoint.sh && chmod +x /usr/local/bin/docker-entrypoint.sh
-
 COPY . /code/
 
-EXPOSE 8000
+# Konvertovat konce řádků a nastavit oprávnění pro skripty
+RUN apt-get update && apt-get install -y dos2unix && \
+    dos2unix /code/entrypoint.sh /code/wait-for-fhir.sh && \
+    chmod +x /code/entrypoint.sh /code/wait-for-fhir.sh && \
+    apt-get remove -y dos2unix && apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
-CMD ["/usr/local/bin/docker-entrypoint.sh"]
+EXPOSE 8000

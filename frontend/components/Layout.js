@@ -7,7 +7,6 @@ import {
   CalendarIcon, 
   UserGroupIcon,
   DocumentChartBarIcon,
-  CogIcon,
   BellIcon,
   UserCircleIcon,
   Bars3Icon,
@@ -22,11 +21,61 @@ export default function Layout({ children, currentUser }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [hasMounted, setHasMounted] = useState(false);
+  const [dashboardStats, setDashboardStats] = useState({
+    activeOperations: 0,
+    availableRooms: 0,
+    utilization: 0
+  });
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     setHasMounted(true);
     return () => clearInterval(timer);
+  }, []);
+
+  // Fetch dashboard stats
+  useEffect(() => {
+    const fetchDashboardStats = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+        const url = apiUrl.startsWith('/api/proxy') 
+          ? '/api/proxy/medic/dashboard/stats/'
+          : `${apiUrl}/medic/dashboard/stats/`;
+        
+        const response = await fetch(url, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const rooms = data.room_utilization || [];
+          
+          // Calculate stats
+          const activeOperations = rooms.filter(room => room.status === 'active').length;
+          const availableRooms = rooms.filter(room => room.status === 'available').length;
+          // Utilization based on how many rooms are not free (not available)
+          const totalRooms = rooms.length;
+          const notFreeRooms = totalRooms - availableRooms;
+          const utilization = totalRooms > 0 ? Math.round((notFreeRooms / totalRooms) * 100) : 0;
+          
+          setDashboardStats({
+            activeOperations,
+            availableRooms,
+            utilization
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching dashboard stats:', err);
+      }
+    };
+
+    fetchDashboardStats();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchDashboardStats, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const formatTime = (date) => {
@@ -64,7 +113,6 @@ export default function Layout({ children, currentUser }) {
     { name: 'Pacienti', href: '/patients', icon: UserGroupIcon, current: router.pathname === '/patients' },
     { name: 'Personál', href: '/staff', icon: UserCircleIcon, current: router.pathname === '/staff' },
     { name: 'Reporty', href: '/reports', icon: DocumentChartBarIcon, current: router.pathname === '/reports' },
-    { name: 'Nastavení', href: '/settings', icon: CogIcon, current: router.pathname === '/settings' },
   ];
 
   return (
@@ -118,13 +166,13 @@ export default function Layout({ children, currentUser }) {
         <div className="absolute bottom-0 w-full p-4 border-t border-gray-200">
           {/* User Switch Menu - umístěno nad tlačítko */}
           {userMenuOpen && (
-            <div className="mb-2 py-2 bg-white border border-gray-200 rounded-lg shadow-lg max-w-xs">
+            <div className="mb-2 py-2 bg-white border-2 rounded-lg shadow-lg max-w-xs" style={{ borderColor: '#E00034' }}>
               {availableUsers.map((user) => (
                 <button
                   key={user.name}
                   onClick={() => handleUserSwitch(user)}
-                  className={`w-full flex items-start px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${
-                    activeUser.name === user.name ? 'bg-blue-50' : ''
+                  className={`w-full flex items-start px-3 py-2 text-sm transition-colors ${
+                    activeUser.name === user.name ? 'bg-[#fce7ed]' : 'hover:bg-gray-50'
                   }`}
                 >
                   <span className="text-xl mr-3 mt-0.5">{user.avatar}</span>
@@ -133,7 +181,7 @@ export default function Layout({ children, currentUser }) {
                     <p className="text-xs text-gray-500">{user.roleLabel}</p>
                   </div>
                   {activeUser.name === user.name && (
-                    <svg className="w-4 h-4 ml-2 mt-1 text-blue-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 ml-2 mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" style={{ color: '#E00034' }}>
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   )}
@@ -143,10 +191,10 @@ export default function Layout({ children, currentUser }) {
           )}
 
           <div 
-            className="flex items-center cursor-pointer hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors"
+            className="flex items-center cursor-pointer hover:bg-red-50 rounded-lg p-2 -m-2 transition-colors"
             onClick={() => setUserMenuOpen(!userMenuOpen)}
           >
-            <div className="bg-blue-100 rounded-full p-2 mr-3 text-xl">
+            <div className="rounded-full p-2 mr-3 text-xl" style={{ backgroundColor: '#fce7ed' }}>
               {activeUser.avatar}
             </div>
             <div className="flex-1 min-w-0">
@@ -186,9 +234,9 @@ export default function Layout({ children, currentUser }) {
 
             {/* Quick Stats */}
             <div className="hidden md:flex items-center space-x-6">
-              <QuickStat label="Aktivní operace" value="3" color="blue" />
-              <QuickStat label="Volné sály" value="7" color="green" />
-              <QuickStat label="Využití" value="65%" color="yellow" />
+              <QuickStat label="Aktivní operace" value={dashboardStats.activeOperations.toString()} color="blue" />
+              <QuickStat label="Volné sály" value={dashboardStats.availableRooms.toString()} color="green" />
+              <QuickStat label="Využití" value={`${dashboardStats.utilization}%`} color="yellow" />
             </div>
 
             {/* Right Actions */}
@@ -244,16 +292,9 @@ export default function Layout({ children, currentUser }) {
 }
 
 function QuickStat({ label, value, color }) {
-  const colors = {
-    blue: 'text-blue-600',
-    green: 'text-green-600',
-    yellow: 'text-yellow-600',
-    red: 'text-red-600',
-  };
-
   return (
     <div className="text-center">
-      <p className={`text-lg font-bold ${colors[color]}`}>{value}</p>
+      <p className="text-lg font-bold text-black">{value}</p>
       <p className="text-xs text-gray-600">{label}</p>
     </div>
   );

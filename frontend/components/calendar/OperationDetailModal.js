@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
+import EditOperationModal from '../nurse/EditOperationModal';
 
 export default function OperationDetailModal({ isOpen, onClose, operationId, onOperationUpdate, currentRole = 'doctor' }) {
   const isDoctor = currentRole === 'doctor';
@@ -10,6 +11,8 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [costSummary, setCostSummary] = useState(null);
 
   useEffect(() => {
     if (isOpen && operationId) {
@@ -23,11 +26,28 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
     try {
       const data = await api.operations.get(operationId);
       setOperation(data);
+      
+      // Načíst souhrn nákladů včetně nástrojů a materiálů
+      if (isNurse) {
+        await fetchCostSummary(operationId);
+      }
     } catch (err) {
       console.error('Error fetching operation details:', err);
       setError('Nepodařilo se načíst data operace');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCostSummary = async (opId) => {
+    try {
+      const response = await fetch(`/api/proxy/medic/nurse/operations/${opId}/cost-summary`);
+      if (response.ok) {
+        const data = await response.json();
+        setCostSummary(data);
+      }
+    } catch (err) {
+      console.error('Error fetching cost summary:', err);
     }
   };
 
@@ -110,8 +130,166 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
   };
 
   const handleEditOperation = () => {
-    // Zobrazit formulář pro úpravu operace
-    alert('Funkce úpravy operace bude implementována v další verzi. Zde sestřička může doplnit:\n- Asistující lékaře\n- Sestry\n- Poznámky\n- Další parametry');
+    setEditModalOpen(true);
+  };
+
+  const handleEditModalClose = () => {
+    setEditModalOpen(false);
+    fetchOperationDetails(); // Refresh data
+  };
+
+  const handleCompletePreparation = async () => {
+    if (!window.confirm('Opravdu chcete dokončit přípravu této operace? Operace bude označena jako připravená.')) {
+      return;
+    }
+    
+    setActionLoading(true);
+    try {
+      const response = await fetch(`/api/proxy/medic/nurse/operations/${operationId}/complete-preparation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Chyba při dokončování přípravy');
+      }
+
+      await fetchOperationDetails();
+      if (onOperationUpdate) {
+        await onOperationUpdate();
+      }
+      alert('Příprava operace byla úspěšně dokončena!');
+    } catch (err) {
+      console.error('Error completing preparation:', err);
+      alert('Chyba při dokončování přípravy: ' + (err.message || 'Neznámá chyba'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancelOperation = async () => {
+    if (!window.confirm('Opravdu chcete zrušit tuto operaci? Operace bude označena jako zrušená.')) {
+      return;
+    }
+    
+    setActionLoading(true);
+    try {
+      await api.operations.update(operationId, {
+        status: 'cancelled'
+      });
+      await fetchOperationDetails();
+      if (onOperationUpdate) {
+        await onOperationUpdate();
+      }
+      alert('Operace byla úspěšně zrušena!');
+    } catch (err) {
+      console.error('Error cancelling operation:', err);
+      alert('Chyba při rušení operace: ' + (err.message || 'Neznámá chyba'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const formatDateTimeLocal = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const handleRescheduleOperation = async () => {
+    const currentStart = operation.scheduled_start ? formatDateTimeLocal(operation.scheduled_start) : '';
+    const currentEnd = operation.scheduled_end ? formatDateTimeLocal(operation.scheduled_end) : '';
+    
+    // Create a modal dialog for better UX
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+    
+    const dialog = document.createElement('div');
+    dialog.style.cssText = 'background: white; padding: 30px; border-radius: 8px; max-width: 500px; width: 90%;';
+    dialog.innerHTML = `
+      <h3 style="margin-bottom: 20px; font-size: 18px; font-weight: bold;">Přeplánovat operaci</h3>
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Nový začátek:</label>
+        <input type="datetime-local" id="reschedule-start" value="${currentStart}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+      </div>
+      <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Nový konec:</label>
+        <input type="datetime-local" id="reschedule-end" value="${currentEnd}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button id="reschedule-cancel" style="padding: 8px 16px; border: 1px solid #ccc; background: white; border-radius: 4px; cursor: pointer;">Zrušit</button>
+        <button id="reschedule-confirm" style="padding: 8px 16px; background: #E00034; color: white; border: none; border-radius: 4px; cursor: pointer;">Přeplánovat</button>
+      </div>
+    `;
+    
+    modal.appendChild(dialog);
+    document.body.appendChild(modal);
+    
+    return new Promise((resolve) => {
+      const cancelBtn = dialog.querySelector('#reschedule-cancel');
+      const confirmBtn = dialog.querySelector('#reschedule-confirm');
+      const startInput = dialog.querySelector('#reschedule-start');
+      const endInput = dialog.querySelector('#reschedule-end');
+      
+      const cleanup = () => {
+        document.body.removeChild(modal);
+        resolve(false);
+      };
+      
+      cancelBtn.onclick = cleanup;
+      modal.onclick = (e) => {
+        if (e.target === modal) cleanup();
+      };
+      
+      confirmBtn.onclick = async () => {
+        const newStart = startInput.value;
+        const newEnd = endInput.value;
+        
+        if (!newStart || !newEnd) {
+          alert('Musíte zadat nový začátek i konec operace');
+          return;
+        }
+
+        const scheduledStart = new Date(newStart).toISOString();
+        const scheduledEnd = new Date(newEnd).toISOString();
+
+        if (scheduledEnd <= scheduledStart) {
+          alert('Konec operace musí být po začátku');
+          return;
+        }
+
+        document.body.removeChild(modal);
+        resolve({ scheduledStart, scheduledEnd });
+      };
+    }).then(async (result) => {
+      if (!result) return;
+      
+      setActionLoading(true);
+      try {
+        await api.operations.update(operationId, {
+          scheduled_start: result.scheduledStart,
+          scheduled_end: result.scheduledEnd
+        });
+        await fetchOperationDetails();
+        if (onOperationUpdate) {
+          await onOperationUpdate();
+        }
+        alert('Operace byla úspěšně přeplánována!');
+      } catch (err) {
+        console.error('Error rescheduling operation:', err);
+        alert('Chyba při přeplánování operace: ' + (err.message || 'Neznámá chyba'));
+      } finally {
+        setActionLoading(false);
+      }
+    });
   };
 
   const formatDateTime = (dateString) => {
@@ -141,8 +319,8 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
       draft: { label: 'Koncept', color: 'bg-gray-100 text-gray-800' },
       pending_approval: { label: 'Čeká na schválení', color: 'bg-orange-100 text-orange-800 border-2 border-orange-400' },
       approved: { label: 'Čeká na přiřazení personálu', color: 'bg-amber-100 text-amber-800 border-2 border-amber-400' },
-      scheduled: { label: 'Naplánováno', color: 'bg-blue-100 text-blue-800' },
-      in_progress: { label: 'Probíhá', color: 'bg-purple-100 text-purple-800' },
+      scheduled: { label: 'Naplánováno', color: 'bg-purple-100 text-purple-800' },
+      in_progress: { label: 'Probíhá', color: 'bg-blue-100 text-blue-800' },
       completed: { label: 'Dokončeno', color: 'bg-green-100 text-green-800' },
       cancelled: { label: 'Zrušeno', color: 'bg-red-100 text-red-800' }
     };
@@ -167,6 +345,7 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
   if (!isOpen) return null;
 
   return (
+    <>
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Background overlay */}
@@ -178,7 +357,7 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
         {/* Modal panel */}
         <div className="inline-block w-full max-w-4xl my-8 overflow-hidden text-left align-middle transition-all transform bg-white rounded-lg shadow-xl">
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-4">
+          <div className="px-6 py-4 bg-gradient-to-r from-[#6D1F27] to-[#E00034]">
             <div className="flex items-center justify-between">
               <h3 className="text-xl font-bold text-white flex items-center">
                 <span className="text-2xl mr-3">⚕️</span>
@@ -199,208 +378,365 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
           <div className="px-6 py-4 max-h-[calc(100vh-200px)] overflow-y-auto">
             {loading && (
               <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                <p className="ml-4 text-gray-600">Načítám data...</p>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: '#A11D30' }}></div>
+                <p className="ml-4 text-black">Načítám data...</p>
               </div>
             )}
 
             {error && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-black-700">
                 {error}
               </div>
             )}
 
             {!loading && !error && operation && (
-              <div className="space-y-6">
-                {/* Status a základní info */}
-                <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                  <div>
-                    <h4 className="text-2xl font-bold text-gray-900">{operation.operation_type}</h4>
-                    <p className="text-sm text-gray-500 mt-1">ID operace: #{operation.id}</p>
-                  </div>
-                  {getStatusBadge(operation.status)}
-                </div>
-
-                {/* Časy */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <h5 className="text-sm font-semibold text-blue-900 mb-3 flex items-center">
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      Naplánovaný čas
-                    </h5>
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-xs text-blue-700">Začátek</p>
-                        <p className="text-sm font-medium text-blue-900">{formatDateTime(operation.scheduled_start)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-blue-700">Konec</p>
-                        <p className="text-sm font-medium text-blue-900">{formatDateTime(operation.scheduled_end)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-blue-700">Plánovaná délka</p>
-                        <p className="text-sm font-medium text-blue-900">{calculateDuration()}</p>
+              <div className="space-y-8">
+                {/* Header Section - Operation Title and Status */}
+                <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div className="flex-1">
+                      <h2 className="text-3xl font-bold text-black mb-2">{operation.operation_type}</h2>
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-black">
+                        <span className="flex items-center">
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                          </svg>
+                          ID: #{operation.id}
+                        </span>
+                        <span className="flex items-center">
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          {formatDateTime(operation.scheduled_start)}
+                        </span>
                       </div>
                     </div>
+                    <div className="flex-shrink-0">
+                      {getStatusBadge(operation.status)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Main Content Grid */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                  {/* Left Column - Patient & Room Info */}
+                  <div className="space-y-6">
+                    {/* Patient Information */}
+                    {operation.patient && (
+                      <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                        <div className="flex items-center mb-4">
+                          <div className="bg-blue-100 rounded-full p-2 mr-3">
+                            <span className="text-2xl">👤</span>
+                          </div>
+                          <h3 className="text-lg font-semibold text-black">Informace o pacientovi</h3>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Jméno a příjmení</p>
+                            <p className="text-sm font-medium text-black mt-1">
+                              {operation.patient.first_name} {operation.patient.last_name}
+                            </p>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Rodné číslo</p>
+                            <p className="text-sm font-medium text-black mt-1">{operation.patient.birth_number}</p>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Datum narození</p>
+                            <p className="text-sm font-medium text-black mt-1">{formatDate(operation.patient.date_of_birth)}</p>
+                          </div>
+                          {operation.patient.diagnosis && (
+                            <div className="bg-gray-50 rounded-lg p-3 sm:col-span-2">
+                              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Diagnóza</p>
+                              <p className="text-sm text-black mt-1">{operation.patient.diagnosis}</p>
+                            </div>
+                          )}
+                        </div>
+                        {operation.patient.medical_history && (
+                          <div className="mt-4 bg-amber-50 rounded-lg p-4 border-l-4 border-amber-400">
+                            <p className="text-xs font-medium text-amber-800 uppercase tracking-wide mb-1">Zdravotní historie</p>
+                            <p className="text-sm text-amber-900">{operation.patient.medical_history}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Operating Room */}
+                    {operation.operating_room && (
+                      <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                        <div className="flex items-center mb-4">
+                          <div className="bg-green-100 rounded-full p-2 mr-3">
+                            <span className="text-2xl">🏥</span>
+                          </div>
+                          <h3 className="text-lg font-semibold text-black">Operační sál</h3>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="text-center">
+                            <div className="bg-gray-50 rounded-lg p-3">
+                              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Název</p>
+                              <p className="text-sm font-medium text-black mt-1">{operation.operating_room.name}</p>
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <div className="bg-gray-50 rounded-lg p-3">
+                              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Číslo</p>
+                              <p className="text-sm font-medium text-black mt-1">{operation.operating_room.room_number}</p>
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <div className="bg-gray-50 rounded-lg p-3">
+                              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Patro</p>
+                              <p className="text-sm font-medium text-black mt-1">{operation.operating_room.floor}. patro</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {(operation.actual_start || operation.actual_end) && (
-                    <div className="bg-green-50 rounded-lg p-4">
-                      <h5 className="text-sm font-semibold text-green-900 mb-3 flex items-center">
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {/* Right Column - Medical Team & Notes */}
+                  <div className="space-y-6">
+                    {/* Medical Team */}
+                    <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                      <div className="flex items-center mb-4">
+                        <div className="bg-purple-100 rounded-full p-2 mr-3">
+                          <span className="text-2xl">👨‍⚕️</span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-black">Lékařský tým</h3>
+                      </div>
+
+                      {/* Primary Doctor */}
+                      {operation.primary_doctor && (
+                        <div className="mb-6">
+                          <h4 className="text-sm font-medium text-purple-800 mb-3 flex items-center">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Primární lékař
+                          </h4>
+                          <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
+                            <p className="text-base font-semibold text-black">
+                              Dr. {operation.primary_doctor.first_name} {operation.primary_doctor.last_name}
+                            </p>
+                            <p className="text-sm text-purple-700 mt-1">{operation.primary_doctor.specialization}</p>
+                            <p className="text-xs text-gray-600 mt-2">
+                              Licence: {operation.primary_doctor.license_number}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Assisting Doctors */}
+                      {operation.assisting_doctors && operation.assisting_doctors.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium text-purple-800 mb-3 flex items-center">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            Asistující lékaři
+                          </h4>
+                          <div className="space-y-3">
+                            {operation.assisting_doctors.map((doctor, index) => (
+                              <div key={index} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                                <p className="text-sm font-medium text-black">
+                                  Dr. {doctor.first_name} {doctor.last_name}
+                                </p>
+                                <p className="text-xs text-gray-600 mt-1">{doctor.specialization}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Notes */}
+                    {operation.notes && (
+                      <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                        <div className="flex items-center mb-4">
+                          <div className="bg-yellow-100 rounded-full p-2 mr-3">
+                            <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <h3 className="text-lg font-semibold text-black">Poznámky</h3>
+                        </div>
+                        <div className="bg-yellow-50 rounded-lg p-4 border-l-4 border-yellow-400">
+                          <p className="text-sm text-black whitespace-pre-wrap leading-relaxed">{operation.notes}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Emergency Indicator */}
+                    {operation.is_emergency && (
+                      <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-6 border border-red-200 border-l-8 border-l-red-500">
+                        <div className="flex items-center">
+                          <div className="bg-red-100 rounded-full p-3 mr-4">
+                            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold text-red-900">Urgentní operace</h3>
+                            <p className="text-sm text-red-700 mt-1">Tato operace vyžaduje prioritní ošetření</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tools and Materials Section - For Nurse */}
+                {isNurse && costSummary && (costSummary.tools_details?.length > 0 || costSummary.materials_details?.length > 0) && (
+                  <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                    <div className="flex items-center mb-6">
+                      <div className="bg-teal-100 rounded-full p-2 mr-3">
+                        <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-lg font-semibold text-black">Nástroje a materiály</h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Tools */}
+                      {costSummary.tools_details?.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-teal-800 mb-3 flex items-center">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+                            </svg>
+                            Nástroje
+                          </h4>
+                          <div className="space-y-2">
+                            {costSummary.tools_details.map((tool, index) => (
+                              <div key={index} className="bg-teal-50 rounded-lg p-3 border border-teal-200">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-black">{tool.name}</p>
+                                    <p className="text-xs text-teal-700 mt-1">{tool.category}</p>
+                                  </div>
+                                  <div className="text-right ml-2">
+                                    <p className="text-sm font-semibold text-black">{tool.quantity}x</p>
+                                    <p className="text-xs text-gray-600">{tool.total_cost.toLocaleString('cs-CZ')} Kč</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            <div className="bg-teal-100 rounded-lg p-3 border-2 border-teal-300 mt-3">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-semibold text-teal-900">Celkem nástroje</span>
+                                <span className="text-sm font-bold text-teal-900">{costSummary.tools_cost.toLocaleString('cs-CZ')} Kč</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Materials */}
+                      {costSummary.materials_details?.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-teal-800 mb-3 flex items-center">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                            Materiály
+                          </h4>
+                          <div className="space-y-2">
+                            {costSummary.materials_details.map((material, index) => (
+                              <div key={index} className="bg-teal-50 rounded-lg p-3 border border-teal-200">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-black">{material.material_name}</p>
+                                    <p className="text-xs text-teal-700 mt-1">{material.material_category}</p>
+                                  </div>
+                                  <div className="text-right ml-2">
+                                    <p className="text-sm font-semibold text-black">{material.quantity_used}x</p>
+                                    <p className="text-xs text-gray-600">{material.cost.toLocaleString('cs-CZ')} Kč</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            <div className="bg-teal-100 rounded-lg p-3 border-2 border-teal-300 mt-3">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-semibold text-teal-900">Celkem materiály</span>
+                                <span className="text-sm font-bold text-teal-900">{costSummary.materials_cost.toLocaleString('cs-CZ')} Kč</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Time Information - Bottom Section */}
+                {(operation.scheduled_start || operation.actual_start) && (
+                  <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                    <div className="flex items-center mb-6">
+                      <div className="bg-indigo-100 rounded-full p-2 mr-3">
+                        <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        Skutečný čas
-                      </h5>
-                      <div className="space-y-2">
-                        {operation.actual_start && (
-                          <div>
-                            <p className="text-xs text-green-700">Zahájení</p>
-                            <p className="text-sm font-medium text-green-900">{formatDateTime(operation.actual_start)}</p>
+                      </div>
+                      <h3 className="text-lg font-semibold text-black">Časové informace</h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Scheduled Time */}
+                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+                        <h4 className="text-sm font-semibold text-blue-900 mb-3 flex items-center">
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          Plánovaný čas
+                        </h4>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center py-2 px-3 bg-white rounded border">
+                            <span className="text-xs font-medium text-blue-700">Začátek</span>
+                            <span className="text-sm font-medium text-black">{formatDateTime(operation.scheduled_start)}</span>
                           </div>
-                        )}
-                        {operation.actual_end && (
-                          <div>
-                            <p className="text-xs text-green-700">Ukončení</p>
-                            <p className="text-sm font-medium text-green-900">{formatDateTime(operation.actual_end)}</p>
+                          <div className="flex justify-between items-center py-2 px-3 bg-white rounded border">
+                            <span className="text-xs font-medium text-blue-700">Konec</span>
+                            <span className="text-sm font-medium text-black">{formatDateTime(operation.scheduled_end)}</span>
                           </div>
-                        )}
-                        {operation.duration_hours > 0 && (
-                          <div>
-                            <p className="text-xs text-green-700">Skutečná délka</p>
-                            <p className="text-sm font-medium text-green-900">{operation.duration_hours.toFixed(2)} hodin</p>
+                          <div className="flex justify-between items-center py-2 px-3 bg-blue-100 rounded border-2 border-blue-300">
+                            <span className="text-xs font-medium text-blue-800">Plánovaná délka</span>
+                            <span className="text-sm font-bold text-blue-900">{calculateDuration()}</span>
                           </div>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
 
-                {/* Pacient */}
-                {operation.patient && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h5 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
-                      <span className="text-xl mr-2">👤</span>
-                      Informace o pacientovi
-                    </h5>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-gray-600">Jméno a příjmení</p>
-                        <p className="text-sm font-medium text-gray-900">
-                          {operation.patient.first_name} {operation.patient.last_name}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-600">Rodné číslo</p>
-                        <p className="text-sm font-medium text-gray-900">{operation.patient.birth_number}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-600">Datum narození</p>
-                        <p className="text-sm font-medium text-gray-900">{formatDate(operation.patient.date_of_birth)}</p>
-                      </div>
-                    </div>
-                    {operation.patient.diagnosis && (
-                      <div className="mt-4">
-                        <p className="text-xs text-gray-600">Diagnóza</p>
-                        <p className="text-sm text-gray-900">{operation.patient.diagnosis}</p>
-                      </div>
-                    )}
-                    {operation.patient.medical_history && (
-                      <div className="mt-4">
-                        <p className="text-xs text-gray-600">Zdravotní historie</p>
-                        <p className="text-sm text-gray-900">{operation.patient.medical_history}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Operační sál */}
-                {operation.operating_room && (
-                  <div className="bg-purple-50 rounded-lg p-4">
-                    <h5 className="text-sm font-semibold text-purple-900 mb-3 flex items-center">
-                      <span className="text-xl mr-2">🏥</span>
-                      Operační sál
-                    </h5>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-xs text-purple-700">Název</p>
-                        <p className="text-sm font-medium text-purple-900">{operation.operating_room.name}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-purple-700">Číslo sálu</p>
-                        <p className="text-sm font-medium text-purple-900">{operation.operating_room.room_number}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-purple-700">Patro</p>
-                        <p className="text-sm font-medium text-purple-900">{operation.operating_room.floor}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Lékaři */}
-                <div className="bg-teal-50 rounded-lg p-4">
-                  <h5 className="text-sm font-semibold text-teal-900 mb-3 flex items-center">
-                    <span className="text-xl mr-2">👨‍⚕️</span>
-                    Lékařský tým
-                  </h5>
-                  {operation.primary_doctor && (
-                    <div className="mb-4">
-                      <p className="text-xs text-teal-700 mb-2">Primární lékař</p>
-                      <div className="bg-white rounded-lg p-3">
-                        <p className="text-sm font-medium text-teal-900">
-                          Dr. {operation.primary_doctor.first_name} {operation.primary_doctor.last_name}
-                        </p>
-                        <p className="text-xs text-teal-700">{operation.primary_doctor.specialization}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Licence: {operation.primary_doctor.license_number}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  {operation.assisting_doctors && operation.assisting_doctors.length > 0 && (
-                    <div>
-                      <p className="text-xs text-teal-700 mb-2">Asistující lékaři</p>
-                      <div className="space-y-2">
-                        {operation.assisting_doctors.map((doctor, index) => (
-                          <div key={index} className="bg-white rounded-lg p-3">
-                            <p className="text-sm font-medium text-teal-900">
-                              Dr. {doctor.first_name} {doctor.last_name}
-                            </p>
-                            <p className="text-xs text-teal-700">{doctor.specialization}</p>
+                      {/* Actual Time */}
+                      {(operation.actual_start || operation.actual_end) && (
+                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
+                          <h4 className="text-sm font-semibold text-green-900 mb-3 flex items-center">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Skutečný čas
+                          </h4>
+                          <div className="space-y-3">
+                            {operation.actual_start && (
+                              <div className="flex justify-between items-center py-2 px-3 bg-white rounded border">
+                                <span className="text-xs font-medium text-green-700">Zahájení</span>
+                                <span className="text-sm font-medium text-black">{formatDateTime(operation.actual_start)}</span>
+                              </div>
+                            )}
+                            {operation.actual_end && (
+                              <div className="flex justify-between items-center py-2 px-3 bg-white rounded border">
+                                <span className="text-xs font-medium text-green-700">Ukončení</span>
+                                <span className="text-sm font-medium text-black">{formatDateTime(operation.actual_end)}</span>
+                              </div>
+                            )}
+                            {operation.duration_hours > 0 && (
+                              <div className="flex justify-between items-center py-2 px-3 bg-green-100 rounded border-2 border-green-300">
+                                <span className="text-xs font-medium text-green-800">Skutečná délka</span>
+                                <span className="text-sm font-bold text-green-900">{operation.duration_hours.toFixed(2)} hodin</span>
+                              </div>
+                            )}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Poznámky */}
-                {operation.notes && (
-                  <div className="bg-yellow-50 rounded-lg p-4">
-                    <h5 className="text-sm font-semibold text-yellow-900 mb-2 flex items-center">
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Poznámky
-                    </h5>
-                    <p className="text-sm text-gray-900 whitespace-pre-wrap">{operation.notes}</p>
-                  </div>
-                )}
-
-                {/* Urgentnost */}
-                {operation.is_emergency && (
-                  <div className="bg-red-50 border-l-4 border-red-500 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <svg className="w-6 h-6 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                      <div>
-                        <p className="text-sm font-semibold text-red-900">Urgentní operace</p>
-                        <p className="text-xs text-red-700">Tato operace vyžaduje prioritní ošetření</p>
-                      </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -409,7 +745,7 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
           </div>
 
           {/* Footer */}
-          <div className="bg-gray-50 px-6 py-4 flex justify-between items-center">
+          <div className="px-6 py-4 flex justify-between items-center" style={{ backgroundColor: 'rgba(161,29,48,0.04)' }}>
             <div className="flex gap-3">
               {/* Admin může schválit nebo zamítnout operace čekající na schválení */}
               {isAdmin && operation && operation.status === 'pending_approval' && (
@@ -417,8 +753,9 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
                   <button
                     onClick={handleApproveOperation}
                     disabled={actionLoading}
-                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
+                    className="px-6 py-2 text-white rounded-lg transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    style={{ backgroundColor: '#A11D30' }}
+                   >
                     {actionLoading ? (
                       <>
                         <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -436,8 +773,9 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
                   <button
                     onClick={handleRejectOperation}
                     disabled={actionLoading}
-                    className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
+                    className="px-6 py-2 text-white rounded-lg transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    style={{ backgroundColor: '#A11D30' }}
+                   >
                     {actionLoading ? (
                       <>
                         <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -454,31 +792,120 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
                   </button>
                 </>
               )}
+
+              {/* Admin může zrušit a přeplánovat schválené/naplánované operace */}
+              {isAdmin && operation && (operation.status === 'approved' || operation.status === 'scheduled') && (
+                <>
+                  <button
+                    onClick={handleRescheduleOperation}
+                    disabled={actionLoading}
+                    className="px-6 py-2 text-white rounded-lg transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    style={{ backgroundColor: '#A11D30' }}
+                  >
+                    {actionLoading ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Přeplánovávám...
+                      </>
+                    ) : (
+                      <>
+                        📅 Přeplánovat operaci
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleCancelOperation}
+                    disabled={actionLoading}
+                    className="px-6 py-2 text-white rounded-lg transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    style={{ backgroundColor: '#A11D30' }}
+                  >
+                    {actionLoading ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Ruším...
+                      </>
+                    ) : (
+                      <>
+                        ❌ Zrušit operaci
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
               
               {/* Sestra může upravit operaci (doplnit parametry) */}
               {isNurse && operation && (operation.status === 'approved' || operation.status === 'scheduled') && (
-                <button
-                  onClick={handleEditOperation}
-                  disabled={actionLoading}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                  ✏️ Upravit operaci
-                </button>
+                <>
+                  <button
+                    onClick={handleEditOperation}
+                    disabled={actionLoading}
+                    className="px-6 py-2 text-white rounded-lg hover:opacity-95 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    style={{ backgroundColor: '#A11D30' }}
+                   >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Upravit operaci
+                  </button>
+                  
+                  {/* Tlačítko pro dokončení přípravy - zobrazí se když je přiřazen lékařský tým */}
+                  {operation.primary_doctor && operation.status !== 'in_progress' && operation.status !== 'completed' && (
+                    <button
+                      onClick={handleCompletePreparation}
+                      disabled={actionLoading}
+                      className="px-6 py-2 text-white rounded-lg hover:opacity-95 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 bg-green-600"
+                     >
+                      {actionLoading ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Dokončuji...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Dokončit přípravu operace
+                        </>
+                      )}
+                    </button>
+                  )}
+                </>
               )}
             </div>
             
             <button
               onClick={onClose}
-              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
-            >
-              Zavřít
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+              className="px-6 py-2 text-white rounded-lg hover:opacity-95 transition-colors font-medium"
+              style={{ backgroundColor: '#A11D30' }}
+             >
+               Zavřít
+             </button>
+           </div>
+         </div>
+       </div>
+     </div>
+
+     <EditOperationModal
+       open={editModalOpen}
+       onClose={handleEditModalClose}
+       operation={operation}
+       onUpdate={async () => {
+         await fetchOperationDetails();
+         if (onOperationUpdate) {
+           await onOperationUpdate();
+         }
+       }}
+     />
+    </>
+   );
 }

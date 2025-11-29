@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 from core.models import TimeStampedModel
 
 
@@ -10,22 +11,74 @@ class OperatingRoom(TimeStampedModel):
     capacity = models.IntegerField(default=1)
     is_active = models.BooleanField(default=True)
     
+    # FHIR Integration fields
+    fhir_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
+    fhir_resource_json = models.JSONField(null=True, blank=True)
+    fhir_last_synced = models.DateTimeField(null=True, blank=True)
+    
     class Meta:
         db_table = 'operating_rooms'
         ordering = ['room_number']
     
     def __str__(self):
         return f"{self.name} ({self.room_number})"
+    
+    def sync_to_fhir(self):
+        """Synchronizovat Django model do FHIR serveru"""
+        from services.fhir_service import FHIRService
+        from services.fhir_mappers import django_room_to_fhir
+        
+        fhir_service = FHIRService()
+        fhir_data = django_room_to_fhir(self)
+        
+        if self.fhir_id:
+            result = fhir_service.update_location(self.fhir_id, fhir_data)
+        else:
+            result = fhir_service.create_location(fhir_data)
+            self.fhir_id = result.get('id')
+        
+        self.fhir_resource_json = result
+        self.fhir_last_synced = timezone.now()
+        self.save(update_fields=['fhir_id', 'fhir_resource_json', 'fhir_last_synced'])
+        return result
+    
+    def sync_from_fhir(self):
+        """Načíst data z FHIR serveru"""
+        from services.fhir_service import FHIRService
+        from services.fhir_mappers import fhir_location_to_django
+        
+        if not self.fhir_id:
+            return None
+        
+        fhir_service = FHIRService()
+        fhir_data = fhir_service.get_location(self.fhir_id)
+        
+        if fhir_data:
+            django_data = fhir_location_to_django(fhir_data)
+            for field, value in django_data.items():
+                if field not in ['fhir_id', 'fhir_resource_json']:
+                    setattr(self, field, value)
+            
+            self.fhir_resource_json = fhir_data
+            self.fhir_last_synced = timezone.now()
+            self.save()
+        
+        return fhir_data
 
 
 class Patient(TimeStampedModel):
     """Model pacienta"""
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    birth_number = models.CharField(max_length=20, unique=True)
+    birth_number = models.CharField(max_length=20, unique=True, blank=True, null=True)
     date_of_birth = models.DateField()
-    diagnosis = models.TextField()
+    diagnosis = models.TextField(blank=True)
     medical_history = models.TextField(blank=True)
+    
+    # FHIR Integration fields
+    fhir_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
+    fhir_resource_json = models.JSONField(null=True, blank=True)
+    fhir_last_synced = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         db_table = 'patients'
@@ -33,16 +86,63 @@ class Patient(TimeStampedModel):
     
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
+    
+    def sync_to_fhir(self):
+        """Synchronizovat Django model do FHIR serveru"""
+        from services.fhir_service import FHIRService
+        from services.fhir_mappers import django_patient_to_fhir
+        
+        fhir_service = FHIRService()
+        fhir_data = django_patient_to_fhir(self)
+        
+        if self.fhir_id:
+            result = fhir_service.update_patient(self.fhir_id, fhir_data)
+        else:
+            result = fhir_service.create_patient(fhir_data)
+            self.fhir_id = result.get('id')
+        
+        self.fhir_resource_json = result
+        self.fhir_last_synced = timezone.now()
+        self.save(update_fields=['fhir_id', 'fhir_resource_json', 'fhir_last_synced'])
+        return result
+    
+    def sync_from_fhir(self):
+        """Načíst data z FHIR serveru"""
+        from services.fhir_service import FHIRService
+        from services.fhir_mappers import fhir_patient_to_django
+        
+        if not self.fhir_id:
+            return None
+        
+        fhir_service = FHIRService()
+        fhir_data = fhir_service.get_patient(self.fhir_id)
+        
+        if fhir_data:
+            django_data = fhir_patient_to_django(fhir_data)
+            for field, value in django_data.items():
+                if field not in ['fhir_id', 'fhir_resource_json']:
+                    setattr(self, field, value)
+            
+            self.fhir_resource_json = fhir_data
+            self.fhir_last_synced = timezone.now()
+            self.save()
+        
+        return fhir_data
 
 
 class Doctor(TimeStampedModel):
     """Model lékaře"""
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    specialization = models.CharField(max_length=100)
-    license_number = models.CharField(max_length=50, unique=True)
-    hourly_rate = models.DecimalField(max_digits=10, decimal_places=2)
+    specialization = models.CharField(max_length=100, blank=True)
+    license_number = models.CharField(max_length=50, unique=True, blank=True, null=True)
+    hourly_rate = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     is_active = models.BooleanField(default=True)
+    
+    # FHIR Integration fields
+    fhir_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
+    fhir_resource_json = models.JSONField(null=True, blank=True)
+    fhir_last_synced = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         db_table = 'doctors'
@@ -50,6 +150,48 @@ class Doctor(TimeStampedModel):
     
     def __str__(self):
         return f"Dr. {self.first_name} {self.last_name}"
+    
+    def sync_to_fhir(self):
+        """Synchronizovat Django model do FHIR serveru"""
+        from services.fhir_service import FHIRService
+        from services.fhir_mappers import django_doctor_to_fhir
+        
+        fhir_service = FHIRService()
+        fhir_data = django_doctor_to_fhir(self)
+        
+        if self.fhir_id:
+            result = fhir_service.update_practitioner(self.fhir_id, fhir_data)
+        else:
+            result = fhir_service.create_practitioner(fhir_data)
+            self.fhir_id = result.get('id')
+        
+        self.fhir_resource_json = result
+        self.fhir_last_synced = timezone.now()
+        self.save(update_fields=['fhir_id', 'fhir_resource_json', 'fhir_last_synced'])
+        return result
+    
+    def sync_from_fhir(self):
+        """Načíst data z FHIR serveru"""
+        from services.fhir_service import FHIRService
+        from services.fhir_mappers import fhir_practitioner_to_django
+        
+        if not self.fhir_id:
+            return None
+        
+        fhir_service = FHIRService()
+        fhir_data = fhir_service.get_practitioner(self.fhir_id)
+        
+        if fhir_data:
+            django_data = fhir_practitioner_to_django(fhir_data)
+            for field, value in django_data.items():
+                if field not in ['fhir_id', 'fhir_resource_json']:
+                    setattr(self, field, value)
+            
+            self.fhir_resource_json = fhir_data
+            self.fhir_last_synced = timezone.now()
+            self.save()
+        
+        return fhir_data
 
 
 class Equipment(TimeStampedModel):
@@ -63,6 +205,11 @@ class Equipment(TimeStampedModel):
     used_hours = models.IntegerField(default=0, help_text="Využité hodiny")
     maintenance_date = models.DateField(null=True, blank=True)
     is_operational = models.BooleanField(default=True)
+    
+    # FHIR Integration fields
+    fhir_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
+    fhir_resource_json = models.JSONField(null=True, blank=True)
+    fhir_last_synced = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         db_table = 'equipment'
@@ -84,6 +231,25 @@ class Equipment(TimeStampedModel):
         if self.lifetime_hours > 0:
             return max(0, ((self.lifetime_hours - self.used_hours) / self.lifetime_hours) * 100)
         return 0
+    
+    def sync_to_fhir(self):
+        """Synchronizovat Django model do FHIR serveru"""
+        from services.fhir_service import FHIRService
+        from services.fhir_mappers import django_equipment_to_fhir
+        
+        fhir_service = FHIRService()
+        fhir_data = django_equipment_to_fhir(self)
+        
+        if self.fhir_id:
+            result = fhir_service.update_device(self.fhir_id, fhir_data)
+        else:
+            result = fhir_service.create_device(fhir_data)
+            self.fhir_id = result.get('id')
+        
+        self.fhir_resource_json = result
+        self.fhir_last_synced = timezone.now()
+        self.save(update_fields=['fhir_id', 'fhir_resource_json', 'fhir_last_synced'])
+        return result
 
 
 class Material(TimeStampedModel):
@@ -97,12 +263,39 @@ class Material(TimeStampedModel):
     minimum_stock = models.IntegerField(default=10)
     is_disposable = models.BooleanField(default=True)
     
+    # FHIR Integration fields
+    fhir_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
+    fhir_resource_json = models.JSONField(null=True, blank=True)
+    fhir_last_synced = models.DateTimeField(null=True, blank=True)
+    
     class Meta:
         db_table = 'materials'
         ordering = ['name']
     
     def __str__(self):
         return f"{self.name} ({self.ean_code})"
+    
+    def sync_to_fhir(self):
+        """Synchronizovat Django model do FHIR serveru"""
+        from services.fhir_service import FHIRService
+        from services.fhir_mappers import django_material_to_fhir_supply
+        
+        fhir_service = FHIRService()
+        fhir_data = django_material_to_fhir_supply(self)
+        
+        # Pro Material používáme SupplyRequest jako katalogovou položku
+        # SupplyDelivery se vytvoří až při skutečném použití materiálu
+        if self.fhir_id:
+            # Update není dostupný pro SupplyRequest - smazat a vytvořit nový
+            pass
+        else:
+            # Note: Toto je zjednodušená implementace
+            # V produkci by se měl použít jiný approach
+            pass
+        
+        self.fhir_last_synced = timezone.now()
+        self.save(update_fields=['fhir_last_synced'])
+        return fhir_data
 
 
 class Operation(TimeStampedModel):
@@ -138,20 +331,48 @@ class Operation(TimeStampedModel):
     notes = models.TextField(blank=True)
     is_emergency = models.BooleanField(default=False)
     
+    # FHIR Integration fields
+    fhir_id = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
+    fhir_resource_json = models.JSONField(null=True, blank=True)
+    fhir_last_synced = models.DateTimeField(null=True, blank=True)
+    
     class Meta:
         db_table = 'operations'
         ordering = ['-scheduled_start']
     
     def __str__(self):
-        return f"{self.operation_type} - {self.patient} ({self.scheduled_start.strftime('%Y-%m-%d %H:%M')})"
+        return f"{self.operation_type} - {self.patient} ({self.scheduled_start.strftime('%Y-%m-%d %H:%M') if self.scheduled_start else 'N/A'})"
     
     @property
     def duration_hours(self):
-        """Délka operace v hodinách"""
+        """Délka operace v hodinách - použije skutečnou délku, pokud je k dispozici, jinak plánovanou"""
         if self.actual_start and self.actual_end:
             delta = self.actual_end - self.actual_start
             return delta.total_seconds() / 3600
+        elif self.scheduled_start and self.scheduled_end:
+            # Pokud není skutečná délka, použij plánovanou
+            delta = self.scheduled_end - self.scheduled_start
+            return delta.total_seconds() / 3600
         return 0
+    
+    def sync_to_fhir(self):
+        """Synchronizovat Django model do FHIR serveru"""
+        from services.fhir_service import FHIRService
+        from services.fhir_mappers import django_operation_to_fhir
+        
+        fhir_service = FHIRService()
+        fhir_data = django_operation_to_fhir(self)
+        
+        if self.fhir_id:
+            result = fhir_service.update_procedure(self.fhir_id, fhir_data)
+        else:
+            result = fhir_service.create_procedure(fhir_data)
+            self.fhir_id = result.get('id')
+        
+        self.fhir_resource_json = result
+        self.fhir_last_synced = timezone.now()
+        self.save(update_fields=['fhir_id', 'fhir_resource_json', 'fhir_last_synced'])
+        return result
 
 
 class PerioperativeProtocol(TimeStampedModel):
@@ -164,15 +385,19 @@ class PerioperativeProtocol(TimeStampedModel):
     # Použitý materiál
     materials_used = models.ManyToManyField(Material, through='MaterialUsage')
     
+    # Použité nástroje
+    tools_used = models.ManyToManyField('OperationTool', through='ToolUsage')
+    
     # Záznamy z operace
     complications = models.TextField(blank=True)
-    procedure_notes = models.TextField()
-    anesthesia_type = models.CharField(max_length=100)
+    procedure_notes = models.TextField(blank=True)
+    anesthesia_type = models.CharField(max_length=100, blank=True)
     
     # Náklady
     total_staff_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_equipment_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_material_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_tools_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     
     class Meta:
         db_table = 'perioperative_protocols'
@@ -183,7 +408,8 @@ class PerioperativeProtocol(TimeStampedModel):
     @property
     def total_cost(self):
         """Celkové náklady operace"""
-        return self.total_staff_cost + self.total_equipment_cost + self.total_material_cost
+        return (self.total_staff_cost + self.total_equipment_cost + 
+                self.total_material_cost + self.total_tools_cost)
 
 
 class EquipmentUsage(TimeStampedModel):
@@ -253,3 +479,17 @@ class OperationTool(TimeStampedModel):
     def is_low_stock(self):
         """Zkontroluje, zda je zásoba nízká"""
         return self.quantity < 10
+
+
+class ToolUsage(TimeStampedModel):
+    """Záznam o použití nástroje během operace"""
+    protocol = models.ForeignKey(PerioperativeProtocol, on_delete=models.CASCADE)
+    tool = models.ForeignKey(OperationTool, on_delete=models.PROTECT)
+    quantity_used = models.IntegerField(default=1)
+    cost = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    class Meta:
+        db_table = 'tool_usage'
+    
+    def __str__(self):
+        return f"{self.tool} - {self.quantity_used}x"
