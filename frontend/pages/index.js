@@ -39,8 +39,17 @@ export default function Home() {
       }
 
       const data = await response.json();
-      console.log('Dashboard data loaded:', data.room_utilization?.length, 'rooms');
-      setRoomsData(data.room_utilization || []);
+      const rooms = data.room_utilization || [];
+      console.log('API Response - rooms count:', rooms.length, 'data:', data);
+      
+      // If API returns empty array, use mock data
+      if (rooms.length === 0) {
+        console.log('API returned empty array, using mock data');
+        const mockData = generateMockRoomsData();
+        setRoomsData(mockData);
+      } else {
+        setRoomsData(rooms);
+      }
       setError(null);
       setLoading(false);
     } catch (err) {
@@ -48,6 +57,7 @@ export default function Home() {
       // Show error but try to load anyway
       setError('Používám mock data - backend není dostupný');
       const mockData = generateMockRoomsData();
+      console.log('Generated mock data:', mockData.length, 'rooms');
       setRoomsData(mockData);
       setLoading(false);
     }
@@ -63,6 +73,11 @@ export default function Home() {
     setIsModalOpen(false);
     setSelectedRoomId(null);
   };
+
+  // Debug: Log rooms data when it changes
+  useEffect(() => {
+    console.log('Rooms data updated:', roomsData.length, 'rooms', roomsData);
+  }, [roomsData]);
 
   if (loading) {
     return (
