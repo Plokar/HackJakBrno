@@ -17,6 +17,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
     notes: '',
     
     // Patient info
+    patientId: '',  // ID pacienta pro načtení z databáze
     patientFirstName: '',
     patientLastName: '',
     patientBirthNumber: '',
@@ -78,17 +79,17 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
-    // Pokud se mění rodné číslo, resetovat stav načteného pacienta
-    if (name === 'patientBirthNumber') {
+    // Pokud se mění ID pacienta, resetovat stav načteného pacienta
+    if (name === 'patientId') {
       setIsPatientLoaded(false);
       setPatientLoadMessage('');
     }
   };
 
   const handleLoadPatient = async () => {
-    const birthNumber = formData.patientBirthNumber.trim();
-    if (!birthNumber) {
-      setPatientLoadMessage('Zadejte rodné číslo');
+    const patientId = formData.patientId.trim();
+    if (!patientId) {
+      setPatientLoadMessage('Zadejte ID pacienta');
       return;
     }
 
@@ -96,32 +97,35 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
     setPatientLoadMessage('');
 
     try {
-      const patient = await api.patients.searchByBirthNumber(birthNumber);
+      const patient = await api.patients.get(parseInt(patientId));
       
       // Doplnit údaje o pacientovi
       setFormData(prev => ({
         ...prev,
         patientFirstName: patient.first_name,
         patientLastName: patient.last_name,
+        patientBirthNumber: patient.birth_number,
         patientDateOfBirth: patient.date_of_birth,
         patientDiagnosis: patient.diagnosis,
         patientMedicalHistory: patient.medical_history || ''
       }));
       
       setIsPatientLoaded(true);
-      setPatientLoadMessage('✓ Pacient nalezen a načten');
+      setPatientLoadMessage('Pacient nalezen a nacten');
       
       // Vymazat případné chyby
       setErrors(prev => ({
         ...prev,
+        patientId: '',
         patientFirstName: '',
         patientLastName: '',
+        patientBirthNumber: '',
         patientDateOfBirth: '',
         patientDiagnosis: ''
       }));
     } catch (error) {
       if (error.status === 404) {
-        setPatientLoadMessage('⚠ Pacient nenalezen - budou vytvořeny nové údaje');
+        setPatientLoadMessage('Pacient nenalezen');
         setIsPatientLoaded(false);
       } else {
         setPatientLoadMessage(`Chyba: ${error.message}`);
@@ -141,6 +145,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
       scheduledEnd: '',
       isEmergency: false,
       notes: '',
+      patientId: '',
       patientFirstName: '',
       patientLastName: '',
       patientBirthNumber: '',
@@ -163,11 +168,17 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
 
     // Doktor vyplňuje jen pacienta a diagnostiku
     if (isDoctor) {
-      if (!formData.patientFirstName) newErrors.patientFirstName = 'Zadejte jméno pacienta';
-      if (!formData.patientLastName) newErrors.patientLastName = 'Zadejte příjmení pacienta';
-      if (!formData.patientBirthNumber) newErrors.patientBirthNumber = 'Zadejte rodné číslo';
-      if (!formData.patientDateOfBirth) newErrors.patientDateOfBirth = 'Zadejte datum narození';
-      if (!formData.patientDiagnosis) newErrors.patientDiagnosis = 'Zadejte diagnózu';
+      // Pokud není načten existující pacient, vyžadovat údaje pro vytvoření nového
+      if (!isPatientLoaded) {
+        if (!formData.patientFirstName) newErrors.patientFirstName = 'Zadejte jméno pacienta';
+        if (!formData.patientLastName) newErrors.patientLastName = 'Zadejte příjmení pacienta';
+        if (!formData.patientBirthNumber) newErrors.patientBirthNumber = 'Zadejte rodné číslo';
+        if (!formData.patientDateOfBirth) newErrors.patientDateOfBirth = 'Zadejte datum narození';
+        if (!formData.patientDiagnosis) newErrors.patientDiagnosis = 'Zadejte diagnózu';
+      } else {
+        // Pokud je načten existující pacient, stačí ID
+        if (!formData.patientId) newErrors.patientId = 'Načtěte pacienta podle ID';
+      }
     }
     
     // Sestra vyplňuje typ operace a personál
@@ -476,31 +487,32 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                 Informace o pacientovi
               </h4>
               
-              {/* Rodné číslo a tlačítko pro načtení */}
+              {/* ID pacienta a tlačítko pro načtení */}
               <div className="mb-4 p-4 bg-[#fce7ed] border border-[#C21533] rounded-lg">
                 <div className="flex items-end gap-3">
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Rodné číslo <span className="text-red-500">*</span>
+                      ID pacienta
                     </label>
                     <input
                       type="text"
-                      name="patientBirthNumber"
-                      value={formData.patientBirthNumber}
+                      name="patientId"
+                      value={formData.patientId}
                       onChange={handleChange}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
-                        errors.patientBirthNumber ? 'border-red-300' : 'border-gray-300'
+                        errors.patientId ? 'border-red-300' : 'border-gray-300'
                       }`}
-                      placeholder="123456/7890"
+                      placeholder="Zadejte ID pacienta pro načtení"
+                      disabled={isPatientLoaded}
                     />
-                    {errors.patientBirthNumber && (
-                      <p className="mt-1 text-xs text-red-500">{errors.patientBirthNumber}</p>
+                    {errors.patientId && (
+                      <p className="mt-1 text-xs text-red-500">{errors.patientId}</p>
                     )}
                   </div>
                   <button
                     type="button"
                     onClick={handleLoadPatient}
-                    disabled={isLoadingPatient || !formData.patientBirthNumber}
+                    disabled={isLoadingPatient || !formData.patientId || isPatientLoaded}
                     className="px-4 py-2 bg-[#C21533] text-white rounded-lg hover:bg-[#8f0f26] transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {isLoadingPatient ? (
@@ -509,11 +521,11 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Načítám...
+                        Nacitam...
                       </>
                     ) : (
                       <>
-                        🔍 Načíst pacienta
+                        Nacist pacienta
                       </>
                     )}
                   </button>
@@ -527,12 +539,15 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     {patientLoadMessage}
                   </div>
                 )}
+                <p className="mt-2 text-xs text-gray-600">
+                  Nechte prazdne pokud chcete vytvorit noveho pacienta
+                </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Jméno <span className="text-red-500">*</span>
+                    Jméno {!isPatientLoaded && <span className="text-red-500">*</span>}
                     {isPatientLoaded && <span className="ml-2 text-xs text-green-600">(načteno z databáze)</span>}
                   </label>
                   <input
@@ -544,6 +559,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                       errors.patientFirstName ? 'border-red-300' : 'border-gray-300'
                     } ${isPatientLoaded ? 'bg-green-50' : ''}`}
                     placeholder="Jan"
+                    disabled={isPatientLoaded}
                   />
                   {errors.patientFirstName && (
                     <p className="mt-1 text-xs text-red-500">{errors.patientFirstName}</p>
@@ -552,7 +568,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Příjmení <span className="text-red-500">*</span>
+                    Příjmení {!isPatientLoaded && <span className="text-red-500">*</span>}
                     {isPatientLoaded && <span className="ml-2 text-xs text-green-600">(načteno z databáze)</span>}
                   </label>
                   <input
@@ -564,6 +580,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                       errors.patientLastName ? 'border-red-300' : 'border-gray-300'
                     } ${isPatientLoaded ? 'bg-green-50' : ''}`}
                     placeholder="Novák"
+                    disabled={isPatientLoaded}
                   />
                   {errors.patientLastName && (
                     <p className="mt-1 text-xs text-red-500">{errors.patientLastName}</p>
@@ -572,7 +589,28 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Datum narození <span className="text-red-500">*</span>
+                    Rodné číslo {!isPatientLoaded && <span className="text-red-500">*</span>}
+                    {isPatientLoaded && <span className="ml-2 text-xs text-green-600">(načteno z databáze)</span>}
+                  </label>
+                  <input
+                    type="text"
+                    name="patientBirthNumber"
+                    value={formData.patientBirthNumber}
+                    onChange={handleChange}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
+                      errors.patientBirthNumber ? 'border-red-300' : 'border-gray-300'
+                    } ${isPatientLoaded ? 'bg-green-50' : ''}`}
+                    placeholder="123456/7890"
+                    disabled={isPatientLoaded}
+                  />
+                  {errors.patientBirthNumber && (
+                    <p className="mt-1 text-xs text-red-500">{errors.patientBirthNumber}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Datum narození {!isPatientLoaded && <span className="text-red-500">*</span>}
                     {isPatientLoaded && <span className="ml-2 text-xs text-green-600">(načteno z databáze)</span>}
                   </label>
                   <input
@@ -583,6 +621,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#C21533] focus:border-transparent ${
                       errors.patientDateOfBirth ? 'border-red-300' : 'border-gray-300'
                     } ${isPatientLoaded ? 'bg-green-50' : ''}`}
+                    disabled={isPatientLoaded}
                   />
                   {errors.patientDateOfBirth && (
                     <p className="mt-1 text-xs text-red-500">{errors.patientDateOfBirth}</p>
@@ -591,7 +630,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Diagnóza <span className="text-red-500">*</span>
+                    Diagnóza {!isPatientLoaded && <span className="text-red-500">*</span>}
                     {isPatientLoaded && <span className="ml-2 text-xs text-green-600">(načteno z databáze)</span>}
                   </label>
                   <textarea
@@ -603,6 +642,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                       errors.patientDiagnosis ? 'border-red-300' : 'border-gray-300'
                     } ${isPatientLoaded ? 'bg-green-50' : ''}`}
                     placeholder="Popis diagnózy..."
+                    disabled={isPatientLoaded}
                   ></textarea>
                   {errors.patientDiagnosis && (
                     <p className="mt-1 text-xs text-red-500">{errors.patientDiagnosis}</p>
@@ -623,6 +663,7 @@ export default function AddOperationModal({ isOpen, onClose, onSubmit, rooms = [
                       isPatientLoaded ? 'bg-green-50' : ''
                     }`}
                     placeholder="Předchozí zdravotní problémy, alergie, léky..."
+                    disabled={isPatientLoaded}
                   ></textarea>
                 </div>
               </div>

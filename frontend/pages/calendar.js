@@ -136,19 +136,26 @@ export default function CalendarPage() {
       // Vytvoření operace přes API
       const operationData = {
         operation_type: formData.operationType,
-        operating_room_id: parseInt(formData.operatingRoomId),
-        primary_doctor_id: parseInt(formData.primaryDoctorId),
+        operating_room_id: formData.operatingRoomId ? parseInt(formData.operatingRoomId) : null,
+        primary_doctor_id: formData.primaryDoctorId ? parseInt(formData.primaryDoctorId) : null,
         scheduled_start: formData.scheduledStart,
         scheduled_end: formData.scheduledEnd,
         is_emergency: formData.isEmergency,
-        notes: formData.notes,
-        patient_first_name: formData.patientFirstName,
-        patient_last_name: formData.patientLastName,
-        patient_birth_number: formData.patientBirthNumber,
-        patient_date_of_birth: formData.patientDateOfBirth,
-        patient_diagnosis: formData.patientDiagnosis,
-        patient_medical_history: formData.patientMedicalHistory
+        notes: formData.notes
       };
+
+      // Pokud existuje ID pacienta (načtený z databáze), použít ho
+      if (formData.patientId && formData.patientId.trim() !== '') {
+        operationData.patient_id = parseInt(formData.patientId);
+      } else {
+        // Pokud pacient neexistuje, poslat všechny údaje pro vytvoření nového
+        operationData.patient_first_name = formData.patientFirstName;
+        operationData.patient_last_name = formData.patientLastName;
+        operationData.patient_birth_number = formData.patientBirthNumber;
+        operationData.patient_date_of_birth = formData.patientDateOfBirth;
+        operationData.patient_diagnosis = formData.patientDiagnosis;
+        operationData.patient_medical_history = formData.patientMedicalHistory;
+      }
 
       const newOperation = await api.operations.create(operationData);
       
