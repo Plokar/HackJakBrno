@@ -309,6 +309,54 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
                               </p>
                             </div>
                           )}
+
+                          {/* Tools Used */}
+                          {roomDetail.currentOperation.tools && roomDetail.currentOperation.tools.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-opacity-30" style={{ borderColor: '#E00034' }}>
+                              <h4 className="text-sm font-semibold text-gray-700 mb-2">Použité nástroje</h4>
+                              <div className="overflow-x-auto">
+                                <table className="min-w-full text-sm">
+                                  <thead>
+                                    <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
+                                      <th className="py-2 pr-4">Nástroj</th>
+                                      <th className="py-2 pr-4">Kategorie</th>
+                                      <th className="py-2 pr-4">Inventární kód</th>
+                                      <th className="py-2 pr-4">Množství</th>
+                                      <th className="py-2 pr-4 text-right">Cena</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {roomDetail.currentOperation.tools.map((tool) => {
+                                      const toolCost = Number(tool.cost || 0);
+                                      return (
+                                        <tr key={tool.id} className="border-t border-gray-100">
+                                          <td className="py-2 pr-4 font-medium text-gray-900">{tool.name}</td>
+                                          <td className="py-2 pr-4 text-gray-600">{tool.category}</td>
+                                          <td className="py-2 pr-4 text-gray-600">{tool.inventory_code || 'N/A'}</td>
+                                          <td className="py-2 pr-4 text-gray-600">{tool.quantity_used}×</td>
+                                          <td className="py-2 pr-0 text-right font-semibold text-gray-900">
+                                            {toolCost.toLocaleString('cs-CZ', { style: 'currency', currency: 'CZK' })}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                              {roomDetail.currentOperation.tool_summary && (
+                                <div className="mt-3 text-xs text-gray-600 flex items-center justify-between">
+                                  <span>Celkem nástrojů: {roomDetail.currentOperation.tool_summary.tool_count}</span>
+                                  <span className="font-semibold text-gray-900">
+                                    Celkové náklady:{' '}
+                                    {roomDetail.currentOperation.tool_summary.total_tools_cost.toLocaleString('cs-CZ', {
+                                      style: 'currency',
+                                      currency: 'CZK'
+                                    })}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="text-center py-8 rounded-lg border-2" style={{ backgroundColor: '#EAEAEA', borderColor: '#666666' }}>

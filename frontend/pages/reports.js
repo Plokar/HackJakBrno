@@ -31,11 +31,11 @@ export default function ReportsPage() {
     setError(null);
     try {
       const [utilization, types, status, timeline, doctors] = await Promise.all([
-        fetch(`/api/proxy/medic/dashboard/analytics/room-utilization/?days=${selectedPeriod}`).then(r => r.json()),
-        fetch(`/api/proxy/medic/dashboard/analytics/operation-types/?days=${selectedPeriod}`).then(r => r.json()),
-        fetch(`/api/proxy/medic/dashboard/analytics/operations-by-status/?days=${selectedPeriod}`).then(r => r.json()),
-        fetch(`/api/proxy/medic/dashboard/analytics/operations-timeline/?days=${selectedPeriod}`).then(r => r.json()),
-        fetch(`/api/proxy/medic/dashboard/analytics/doctors-performance/?days=${selectedPeriod}`).then(r => r.json())
+        fetch(`/api/proxy/medic/dashboard/analytics/room-utilization?days=${selectedPeriod}`).then(r => r.json()),
+        fetch(`/api/proxy/medic/dashboard/analytics/operation-types?days=${selectedPeriod}`).then(r => r.json()),
+        fetch(`/api/proxy/medic/dashboard/analytics/operations-by-status?days=${selectedPeriod}`).then(r => r.json()),
+        fetch(`/api/proxy/medic/dashboard/analytics/operations-timeline?days=${selectedPeriod}`).then(r => r.json()),
+        fetch(`/api/proxy/medic/dashboard/analytics/doctors-performance?days=${selectedPeriod}`).then(r => r.json())
       ]);
       
       setRoomUtilization(utilization);

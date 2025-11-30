@@ -15,6 +15,8 @@ export default function PatientDetailModal({ patient, onClose }) {
   const [activeTab, setActiveTab] = useState('overview');
 
   if (!patient) return null;
+  const activeOperation = patient.activeOperation || patient.active_operation || null;
+  const operations = patient.operations || [];
 
   const tabs = [
     { id: 'overview', label: 'Přehled', icon: UserCircleIcon },
@@ -72,6 +74,13 @@ export default function PatientDetailModal({ patient, onClose }) {
         </div>
       </div>
 
+      {/* Active operation banner */}
+      {activeOperation && (
+        <div className="mx-6 mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <ActiveOperationCard operation={activeOperation} />
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <div className="flex space-x-1 p-2">
@@ -98,16 +107,16 @@ export default function PatientDetailModal({ patient, onClose }) {
 
       {/* Content */}
       <div className="p-6 overflow-y-auto max-h-[calc(90vh-250px)]">
-        {activeTab === 'overview' && <OverviewTab patient={patient} age={age} />}
+        {activeTab === 'overview' && <OverviewTab patient={patient} age={age} activeOperation={activeOperation} />}
         {activeTab === 'medical' && <MedicalTab patient={patient} />}
-        {activeTab === 'operations' && <OperationsTab operations={patient.operations} />}
+        {activeTab === 'operations' && <OperationsTab operations={operations} activeOperation={activeOperation} />}
         {activeTab === 'fhir' && <FHIRTab patient={patient} />}
       </div>
     </div>
   );
 }
 
-function OverviewTab({ patient, age }) {
+function OverviewTab({ patient, age, activeOperation }) {
   return (
     <div className="space-y-6">
       {/* Basic Information */}
@@ -171,6 +180,12 @@ function OverviewTab({ patient, age }) {
           />
         </div>
       </InfoCard>
+
+      {activeOperation && (
+        <InfoCard title="Probíhající operace">
+          <ActiveOperationCard operation={activeOperation} />
+        </InfoCard>
+      )}
     </div>
   );
 }
@@ -197,7 +212,7 @@ function MedicalTab({ patient }) {
   );
 }
 
-function OperationsTab({ operations = [] }) {
+function OperationsTab({ operations = [], activeOperation }) {
   if (operations.length === 0) {
     return (
       <div className="text-center py-12">
@@ -207,51 +222,62 @@ function OperationsTab({ operations = [] }) {
     );
   }
 
+  const renderStatusBadge = (status) => {
+    const map = {
+      completed: 'bg-green-100 text-green-800',
+      in_progress: 'bg-blue-100 text-blue-800',
+      scheduled: 'bg-purple-100 text-purple-800',
+      pending_approval: 'bg-orange-100 text-orange-800'
+    };
+
+    return classNames(
+      'px-2 py-1 rounded-full text-xs font-medium',
+      map[status] || 'bg-gray-100 text-gray-800'
+    );
+  };
+
   return (
-    <div className="space-y-3">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+    <div className="space-y-4">
+      {activeOperation && (
+        <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-blue-900 mb-2">Aktuální operace</h3>
+          <ActiveOperationCard operation={activeOperation} compact />
+        </div>
+      )}
+      <h3 className="text-lg font-semibold text-gray-900">
         Historie operací ({operations.length})
       </h3>
-      {operations.map((operation) => (
-        <div key={operation.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-start">
-            <div className="flex-1">
-              <h4 className="font-medium text-gray-900">{operation.type || operation.operation_type}</h4>
-              {operation.doctor && (
+      {operations.map((operation) => {
+        const dateRef = operation.actual_start || operation.scheduled_start || operation.date;
+        const duration = operation.duration_hours ?? operation.duration;
+        return (
+          <div key={operation.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <h4 className="font-medium text-gray-900">{operation.operation_type || operation.type || 'Operace'}</h4>
                 <p className="text-sm text-gray-600 mt-1">
-                  Lékař: {operation.doctor}
+                  Chirurg: {operation.primary_doctor_name || operation.doctor || 'Neuvedeno'}
                 </p>
-              )}
-              <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                <span>
-                  {operation.date 
-                    ? new Date(operation.date).toLocaleDateString('cs-CZ')
-                    : operation.scheduled_start
-                    ? new Date(operation.scheduled_start).toLocaleDateString('cs-CZ')
-                    : 'N/A'}
-                </span>
-                {operation.duration && <span>Trvání: {operation.duration}h</span>}
-                {operation.room && <span>Sál: {operation.room}</span>}
+                <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500 flex-wrap gap-y-1">
+                  <span>
+                    {dateRef
+                      ? new Date(dateRef).toLocaleDateString('cs-CZ')
+                      : 'Datum N/A'}
+                  </span>
+                  {duration !== undefined && <span>Trvání: {Number(duration).toFixed(1)}h</span>}
+                  {operation.room?.name && <span>Sál: {operation.room.name}</span>}
+                </div>
               </div>
+              <span className={renderStatusBadge(operation.status)}>
+                {operation.status === 'completed' ? 'Dokončeno' :
+                 operation.status === 'in_progress' ? 'Probíhá' :
+                 operation.status === 'scheduled' ? 'Naplánováno' :
+                 operation.status === 'pending_approval' ? 'Čeká na schválení' : 'Neznámý'}
+              </span>
             </div>
-            <span className={classNames(
-              'px-2 py-1 rounded-full text-xs font-medium',
-              operation.status === 'completed' 
-                ? 'bg-green-100 text-green-800'
-                : operation.status === 'in_progress'
-                ? 'bg-blue-100 text-blue-800'
-                : operation.status === 'scheduled'
-                ? 'bg-purple-100 text-purple-800'
-                : 'bg-gray-100 text-gray-800'
-            )}>
-              {operation.status === 'completed' ? 'Dokončeno' : 
-               operation.status === 'in_progress' ? 'Probíhá' : 
-               operation.status === 'scheduled' ? 'Naplánováno' :
-               operation.status || 'Neznámý'}
-            </span>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -304,6 +330,49 @@ function InfoRow({ label, value }) {
     <div className="flex justify-between items-start">
       <span className="text-sm text-gray-600">{label}:</span>
       <span className="text-sm font-medium text-gray-900 text-right ml-2">{value}</span>
+    </div>
+  );
+}
+
+function ActiveOperationCard({ operation, compact = false }) {
+  const start = operation.actual_start || operation.scheduled_start;
+  const end = operation.estimatedEnd || operation.scheduled_end || operation.actual_end;
+
+  return (
+    <div className={compact ? '' : 'bg-white rounded-lg p-4 border border-blue-100'}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-gray-900">
+            {operation.operation_type || operation.type || 'Operace'}
+          </p>
+          <p className="text-xs text-gray-500">
+            Chirurg: {operation.surgeon || operation.primary_doctor_name || 'Neuvedeno'}
+          </p>
+        </div>
+        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+          {operation.is_emergency ? 'Urgentní' : 'Probíhá'}
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-gray-600">
+        <div>
+          <p className="uppercase tracking-wide text-[10px] text-gray-500">Začátek</p>
+          <p className="font-semibold text-gray-900">
+            {start ? new Date(start).toLocaleString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+          </p>
+        </div>
+        <div>
+          <p className="uppercase tracking-wide text-[10px] text-gray-500">Odhadovaný konec</p>
+          <p className="font-semibold text-gray-900">
+            {end ? new Date(end).toLocaleString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+          </p>
+        </div>
+        <div>
+          <p className="uppercase tracking-wide text-[10px] text-gray-500">Operační sál</p>
+          <p className="font-semibold text-gray-900">
+            {operation.room?.name || 'Neuvedeno'}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

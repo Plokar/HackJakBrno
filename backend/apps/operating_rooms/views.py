@@ -11,7 +11,7 @@ import io
 from .models import (
     OperatingRoom, Patient, Doctor, Equipment, Material,
     Operation, PerioperativeProtocol, EquipmentUsage, MaterialUsage,
-    OperationTool
+    OperationTool, ToolUsage
 )
 from .serializers import (
     OperatingRoomSerializer, PatientSerializer, DoctorSerializer,
@@ -113,6 +113,34 @@ class OperatingRoomViewSet(viewsets.ModelViewSet):
                 'is_emergency': current_operation.is_emergency,
                 'notes': current_operation.notes or '',
             }
+
+            # Přidat informace o použitých nástrojích z perioperačního protokolu
+            try:
+                protocol = current_operation.protocol
+            except PerioperativeProtocol.DoesNotExist:
+                protocol = None
+
+            tools_data = []
+            if protocol:
+                tool_usages = ToolUsage.objects.filter(protocol=protocol).select_related('tool')
+                for usage in tool_usages:
+                    tools_data.append({
+                        'id': usage.tool.id,
+                        'name': usage.tool.name,
+                        'category': usage.tool.category,
+                        'inventory_code': usage.tool.inventory_code,
+                        'status': usage.tool.status,
+                        'quantity_used': usage.quantity_used,
+                        'cost': float(usage.cost),
+                    })
+
+                response_data['currentOperation']['tools'] = tools_data
+                response_data['currentOperation']['tool_summary'] = {
+                    'total_tools_cost': float(protocol.total_tools_cost),
+                    'tool_count': len(tools_data),
+                }
+            else:
+                response_data['currentOperation']['tools'] = []
         
         # Přidat nadcházející operace
         if upcoming_operations.exists():
@@ -838,19 +866,30 @@ class DashboardViewSet(viewsets.ViewSet):
             scheduled_start__date__lte=end_date
         )
         
-        type_counts = operations.values('operation_type').annotate(
-            count=Count('id'),
-            total_hours=Sum('duration_hours')
-        ).order_by('-count')
+        type_stats = {}
+        for operation in operations:
+            op_type = operation.operation_type or 'Neznámý typ'
+            if op_type not in type_stats:
+                type_stats[op_type] = {
+                    'type': op_type,
+                    'count': 0,
+                    'total_hours': 0.0,
+                }
+            type_stats[op_type]['count'] += 1
+            type_stats[op_type]['total_hours'] += float(operation.duration_hours or 0)
         
-        data = [
-            {
-                'type': item['operation_type'],
-                'count': item['count'],
-                'total_hours': round(item['total_hours'] or 0, 2)
-            }
-            for item in type_counts
-        ]
+        data = sorted(
+            (
+                {
+                    'type': stats['type'],
+                    'count': stats['count'],
+                    'total_hours': round(stats['total_hours'], 2),
+                }
+                for stats in type_stats.values()
+            ),
+            key=lambda item: item['count'],
+            reverse=True
+        )
         
         return Response(data)
     
@@ -936,29 +975,39 @@ class DashboardViewSet(viewsets.ViewSet):
             scheduled_start__date__gte=start_date,
             scheduled_start__date__lte=end_date,
             primary_doctor__isnull=False
-        )
+        ).select_related('primary_doctor')
         
-        doctor_stats = operations.values(
-            'primary_doctor__id',
-            'primary_doctor__first_name',
-            'primary_doctor__last_name'
-        ).annotate(
-            total_operations=Count('id'),
-            completed_operations=Count('id', filter=Q(status='completed')),
-            total_hours=Sum('duration_hours')
-        ).order_by('-total_operations')
+        doctor_stats = {}
+        for operation in operations:
+            doctor = operation.primary_doctor
+            if not doctor:
+                continue
+            
+            if doctor.id not in doctor_stats:
+                doctor_stats[doctor.id] = {
+                    'doctor_id': doctor.id,
+                    'doctor_name': f"Dr. {doctor.first_name} {doctor.last_name}",
+                    'total_operations': 0,
+                    'completed_operations': 0,
+                    'total_hours': 0.0,
+                }
+            
+            stats = doctor_stats[doctor.id]
+            stats['total_operations'] += 1
+            if operation.status == 'completed':
+                stats['completed_operations'] += 1
+            stats['total_hours'] += float(operation.duration_hours or 0)
         
-        data = [
-            {
-                'doctor_id': item['primary_doctor__id'],
-                'doctor_name': f"Dr. {item['primary_doctor__first_name']} {item['primary_doctor__last_name']}",
-                'total_operations': item['total_operations'],
-                'completed_operations': item['completed_operations'],
-                'total_hours': round(item['total_hours'] or 0, 2),
-                'avg_duration': round((item['total_hours'] or 0) / item['total_operations'], 2) if item['total_operations'] > 0 else 0
-            }
-            for item in doctor_stats
-        ]
+        data = []
+        for stats in doctor_stats.values():
+            avg_duration = stats['total_hours'] / stats['total_operations'] if stats['total_operations'] > 0 else 0
+            data.append({
+                **stats,
+                'total_hours': round(stats['total_hours'], 2),
+                'avg_duration': round(avg_duration, 2),
+            })
+        
+        data.sort(key=lambda item: item['total_operations'], reverse=True)
         
         return Response(data)
 

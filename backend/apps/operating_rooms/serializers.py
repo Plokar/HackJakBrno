@@ -1,3 +1,4 @@
+from django.db.models import Q
 from rest_framework import serializers
 from .models import (
     OperatingRoom, Patient, Doctor, Equipment, Material,
@@ -12,16 +13,93 @@ class OperatingRoomSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class OperationSummarySerializer(serializers.ModelSerializer):
+    room = serializers.SerializerMethodField()
+    primary_doctor_name = serializers.SerializerMethodField()
+    patient_name = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    class Meta:
+        model = Operation
+        fields = [
+            'id',
+            'operation_type',
+            'status',
+            'status_display',
+            'scheduled_start',
+            'scheduled_end',
+            'actual_start',
+            'actual_end',
+            'duration_hours',
+            'room',
+            'primary_doctor_name',
+            'patient_name',
+            'is_emergency',
+        ]
+
+    def get_room(self, obj):
+        if obj.operating_room:
+            return {
+                'id': obj.operating_room.id,
+                'name': obj.operating_room.name,
+                'room_number': obj.operating_room.room_number,
+            }
+        return None
+
+    def get_primary_doctor_name(self, obj):
+        if obj.primary_doctor:
+            return f"Dr. {obj.primary_doctor.first_name} {obj.primary_doctor.last_name}"
+        return None
+
+    def get_patient_name(self, obj):
+        if obj.patient:
+            return f"{obj.patient.first_name} {obj.patient.last_name}"
+        return None
+
+
 class PatientSerializer(serializers.ModelSerializer):
+    operations = serializers.SerializerMethodField()
+    active_operation = serializers.SerializerMethodField()
+
     class Meta:
         model = Patient
         fields = '__all__'
 
+    def get_operations(self, obj):
+        operations = obj.operations.order_by('-scheduled_start')[:10]
+        return OperationSummarySerializer(operations, many=True).data
+
+    def get_active_operation(self, obj):
+        operation = obj.operations.filter(
+            status__in=['in_progress', 'scheduled']
+        ).order_by('-status', '-scheduled_start').first()
+        if operation:
+            return OperationSummarySerializer(operation).data
+        return None
+
 
 class DoctorSerializer(serializers.ModelSerializer):
+    operations = serializers.SerializerMethodField()
+    current_operations = serializers.SerializerMethodField()
+
     class Meta:
         model = Doctor
         fields = '__all__'
+
+    def get_operations(self, obj):
+        operations = Operation.objects.filter(
+            Q(primary_doctor=obj) | Q(assisting_doctors=obj)
+        ).order_by('-scheduled_start').distinct()[:10]
+        return OperationSummarySerializer(operations, many=True).data
+
+    def get_current_operations(self, obj):
+        operations = Operation.objects.filter(
+            Q(primary_doctor=obj) | Q(assisting_doctors=obj),
+            status='in_progress'
+        ).order_by('-scheduled_start').distinct()
+        if not operations.exists():
+            return []
+        return OperationSummarySerializer(operations, many=True).data
 
 
 class EquipmentSerializer(serializers.ModelSerializer):
