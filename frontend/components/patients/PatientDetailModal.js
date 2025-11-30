@@ -44,7 +44,7 @@ export default function PatientDetailModal({ patient, onClose }) {
         <div className="flex justify-between items-start">
           <div className="flex items-center space-x-4">
             <div className="bg-white bg-opacity-20 rounded-full p-3">
-              <UserCircleIcon className="h-12 w-12" />
+              <UserCircleIcon className="h-12 w-12 text-blue-500" />
             </div>
             <div>
               <h2 className="text-2xl font-bold">{patient.name || `${patient.first_name} ${patient.last_name}`}</h2>
