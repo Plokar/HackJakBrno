@@ -45,25 +45,46 @@ function PatientsPageContent() {
   }
 
   // Převést FHIR data na formát pro PatientList a přidat všechna data pro modal
-  const patients = (patientsData || []).map(patient => ({
-    id: patient.id,
-    name: `${patient.first_name} ${patient.last_name}`,
-    first_name: patient.first_name,
-    last_name: patient.last_name,
-    birthDate: patient.date_of_birth,
-    date_of_birth: patient.date_of_birth,
-    birthNumber: patient.birth_number,
-    birth_number: patient.birth_number,
-    diagnosis: patient.diagnosis,
-    medical_history: patient.medical_history,
-    status: 'scheduled',
-    priority: 'normal',
-    scheduledOperation: null,
-    fhir_id: patient.fhir_id,
-    fhir_resource_json: patient.fhir_resource_json,
-    fhir_last_synced: patient.fhir_last_synced,
-    operations: []
-  }));
+  const patients = (patientsData || []).map(patient => {
+    const activeOperation = patient.active_operation || null;
+    const operations = patient.operations || [];
+    const inferredStatus = activeOperation
+      ? (activeOperation.status === 'in_progress' ? 'in_operation' : activeOperation.status)
+      : (patient.status || 'scheduled');
+    const inferredPriority = activeOperation?.is_emergency ? 'urgent' : (patient.priority || 'normal');
+
+    return {
+      id: patient.id,
+      name: `${patient.first_name} ${patient.last_name}`,
+      first_name: patient.first_name,
+      last_name: patient.last_name,
+      birthDate: patient.date_of_birth,
+      date_of_birth: patient.date_of_birth,
+      birthNumber: patient.birth_number,
+      birth_number: patient.birth_number,
+      diagnosis: patient.diagnosis,
+      medical_history: patient.medical_history,
+      status: inferredStatus,
+      priority: inferredPriority,
+      scheduledOperation: activeOperation
+        ? {
+            date: activeOperation.scheduled_start,
+            time: activeOperation.scheduled_start
+              ? new Date(activeOperation.scheduled_start).toLocaleTimeString('cs-CZ', {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })
+              : null,
+            type: activeOperation.operation_type,
+          }
+        : null,
+      fhir_id: patient.fhir_id,
+      fhir_resource_json: patient.fhir_resource_json,
+      fhir_last_synced: patient.fhir_last_synced,
+      operations,
+      activeOperation,
+    };
+  });
 
   return (
     <>

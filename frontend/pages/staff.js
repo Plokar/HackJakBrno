@@ -51,7 +51,9 @@ function StaffPageContent() {
     license_number: doctor.license_number,
     hourly_rate: doctor.hourly_rate,
     is_active: doctor.is_active,
-    fhir_id: doctor.fhir_id
+    fhir_id: doctor.fhir_id,
+    operations: doctor.operations || [],
+    current_operations: doctor.current_operations || []
   }));
 
   return (

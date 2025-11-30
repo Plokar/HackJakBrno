@@ -10,6 +10,7 @@ import classNames from 'classnames';
 
 export default function DoctorProfile({ doctor, onClose }) {
   const [activeTab, setActiveTab] = useState('overview');
+  const currentOperations = doctor.current_operations || doctor.currentOperations || [];
 
   if (!doctor) return null;
 
@@ -76,7 +77,7 @@ export default function DoctorProfile({ doctor, onClose }) {
 
       {/* Content */}
       <div className="p-6 overflow-y-auto max-h-[calc(90vh-250px)]">
-        {activeTab === 'overview' && <OverviewTab doctor={doctor} />}
+        {activeTab === 'overview' && <OverviewTab doctor={doctor} currentOperations={currentOperations} />}
         {activeTab === 'schedule' && <ScheduleTab schedule={doctor.schedule} />}
         {activeTab === 'operations' && <OperationsHistoryTab operations={doctor.operations} />}
       </div>
@@ -84,7 +85,7 @@ export default function DoctorProfile({ doctor, onClose }) {
   );
 }
 
-function OverviewTab({ doctor }) {
+function OverviewTab({ doctor, currentOperations = [] }) {
   return (
     <div className="space-y-6">
       {/* Contact Information */}
@@ -158,6 +159,42 @@ function OverviewTab({ doctor }) {
           color="yellow"
         />
       </div>
+
+      {currentOperations.length > 0 && (
+        <InfoCard title="Aktuálně probíhající operace">
+          <div className="space-y-3">
+            {currentOperations.map((operation) => (
+              <div key={operation.id} className="p-3 bg-white rounded border border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {operation.operation_type || operation.type || 'Operace'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Pacient: {operation.patient_name || operation.patientName || 'Neuvedeno'}
+                    </p>
+                  </div>
+                  <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                    Probíhá
+                  </span>
+                </div>
+                <div className="mt-2 text-xs text-gray-600 flex flex-wrap gap-4">
+                  <span>
+                    Začátek:{' '}
+                    {operation.actual_start
+                      ? new Date(operation.actual_start).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })
+                      : operation.scheduled_start
+                      ? new Date(operation.scheduled_start).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' })
+                      : 'N/A'}
+                  </span>
+                  {operation.room?.name && <span>Sál: {operation.room.name}</span>}
+                  {operation.duration_hours && <span>Trvání: {operation.duration_hours.toFixed(1)}h</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </InfoCard>
+      )}
     </div>
   );
 }
@@ -215,34 +252,43 @@ function OperationsHistoryTab({ operations = [] }) {
       <h3 className="text-lg font-semibold text-gray-900 mb-4">
         Historie operací ({operations.length})
       </h3>
-      {operations.map((operation) => (
-        <div key={operation.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-start">
-            <div className="flex-1">
-              <h4 className="font-medium text-gray-900">{operation.type}</h4>
-              <p className="text-sm text-gray-600 mt-1">
-                Pacient: {operation.patientName}
-              </p>
-              <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                <span>{new Date(operation.date).toLocaleDateString('cs-CZ')}</span>
-                <span>Trvání: {operation.duration}h</span>
-                <span>Sál: {operation.room}</span>
+      {operations.map((operation) => {
+        const dateSource = operation.actual_start || operation.scheduled_start || operation.date;
+        const duration = operation.duration_hours ?? operation.duration;
+        const roomName = operation.room?.name || operation.room || 'N/A';
+        const patientName = operation.patient_name || operation.patientName || 'Neuvedeno';
+        const status = operation.status || 'unknown';
+
+        return (
+          <div key={operation.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <h4 className="font-medium text-gray-900">{operation.operation_type || operation.type || 'Operace'}</h4>
+                <p className="text-sm text-gray-600 mt-1">
+                  Pacient: {patientName}
+                </p>
+                <div className="flex items-center flex-wrap gap-4 mt-2 text-xs text-gray-500">
+                  <span>{dateSource ? new Date(dateSource).toLocaleDateString('cs-CZ') : 'Datum N/A'}</span>
+                  {duration !== undefined && <span>Trvání: {Number(duration).toFixed(1)}h</span>}
+                  <span>Sál: {roomName}</span>
+                </div>
               </div>
+              <span className={classNames(
+                'px-2 py-1 rounded-full text-xs font-medium',
+                status === 'completed'
+                  ? 'bg-green-100 text-green-800'
+                  : status === 'in_progress'
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-gray-100 text-gray-800'
+              )}>
+                {status === 'completed' ? 'Dokončeno' :
+                 status === 'in_progress' ? 'Probíhá' :
+                 status === 'scheduled' ? 'Naplánováno' : 'Neznámý'}
+              </span>
             </div>
-            <span className={classNames(
-              'px-2 py-1 rounded-full text-xs font-medium',
-              operation.status === 'completed' 
-                ? 'bg-green-100 text-green-800'
-                : operation.status === 'in_progress'
-                ? 'bg-blue-100 text-blue-800'
-                : 'bg-gray-100 text-gray-800'
-            )}>
-              {operation.status === 'completed' ? 'Dokončeno' : 
-               operation.status === 'in_progress' ? 'Probíhá' : 'Zrušeno'}
-            </span>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
