@@ -77,11 +77,26 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'core.middleware.MockAuthMiddleware',  # Mock auth pro DEMO
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.RateLimitMiddleware',  # Rate limiting
     'core.middleware.SecurityHeadersMiddleware',
 ]
+
+# Odebrat CSRF middleware pro demo (stejně jako v dev)
+MIDDLEWARE = [m for m in MIDDLEWARE if 'CsrfViewMiddleware' not in m]
+
+# Pro DEMO - vypnout CSRF ochranu úplně a použít MockAuthentication (stejně jako v dev)
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'core.authentication.MockAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+}
 
 # Cache pro rate limiting (použijte Redis v produkci)
 CACHES = {
@@ -141,3 +156,9 @@ EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+
+# CSRF exemption pro DEMO - povolit API bez CSRF tokenu
+CSRF_COOKIE_HTTPONLY = False
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = True
