@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
+import EditOperationModal from '../nurse/EditOperationModal';
 
 export default function OperationDetailModal({ isOpen, onClose, operationId, onOperationUpdate, currentRole = 'doctor' }) {
   const isDoctor = currentRole === 'doctor';
@@ -10,6 +11,8 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [costSummary, setCostSummary] = useState(null);
 
   useEffect(() => {
     if (isOpen && operationId) {
@@ -23,11 +26,28 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
     try {
       const data = await api.operations.get(operationId);
       setOperation(data);
+      
+      // Načíst souhrn nákladů včetně nástrojů a materiálů
+      if (isNurse) {
+        await fetchCostSummary(operationId);
+      }
     } catch (err) {
       console.error('Error fetching operation details:', err);
       setError('Nepodařilo se načíst data operace');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCostSummary = async (opId) => {
+    try {
+      const response = await fetch(`/api/proxy/medic/nurse/operations/${opId}/cost-summary`);
+      if (response.ok) {
+        const data = await response.json();
+        setCostSummary(data);
+      }
+    } catch (err) {
+      console.error('Error fetching cost summary:', err);
     }
   };
 
@@ -110,8 +130,166 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
   };
 
   const handleEditOperation = () => {
-    // Zobrazit formulář pro úpravu operace
-    alert('Funkce úpravy operace bude implementována v další verzi. Zde sestřička může doplnit:\n- Asistující lékaře\n- Sestry\n- Poznámky\n- Další parametry');
+    setEditModalOpen(true);
+  };
+
+  const handleEditModalClose = () => {
+    setEditModalOpen(false);
+    fetchOperationDetails(); // Refresh data
+  };
+
+  const handleCompletePreparation = async () => {
+    if (!window.confirm('Opravdu chcete dokončit přípravu této operace? Operace bude označena jako připravená.')) {
+      return;
+    }
+    
+    setActionLoading(true);
+    try {
+      const response = await fetch(`/api/proxy/medic/nurse/operations/${operationId}/complete-preparation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Chyba při dokončování přípravy');
+      }
+
+      await fetchOperationDetails();
+      if (onOperationUpdate) {
+        await onOperationUpdate();
+      }
+      alert('Příprava operace byla úspěšně dokončena!');
+    } catch (err) {
+      console.error('Error completing preparation:', err);
+      alert('Chyba při dokončování přípravy: ' + (err.message || 'Neznámá chyba'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancelOperation = async () => {
+    if (!window.confirm('Opravdu chcete zrušit tuto operaci? Operace bude označena jako zrušená.')) {
+      return;
+    }
+    
+    setActionLoading(true);
+    try {
+      await api.operations.update(operationId, {
+        status: 'cancelled'
+      });
+      await fetchOperationDetails();
+      if (onOperationUpdate) {
+        await onOperationUpdate();
+      }
+      alert('Operace byla úspěšně zrušena!');
+    } catch (err) {
+      console.error('Error cancelling operation:', err);
+      alert('Chyba při rušení operace: ' + (err.message || 'Neznámá chyba'));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const formatDateTimeLocal = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const handleRescheduleOperation = async () => {
+    const currentStart = operation.scheduled_start ? formatDateTimeLocal(operation.scheduled_start) : '';
+    const currentEnd = operation.scheduled_end ? formatDateTimeLocal(operation.scheduled_end) : '';
+    
+    // Create a modal dialog for better UX
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+    
+    const dialog = document.createElement('div');
+    dialog.style.cssText = 'background: white; padding: 30px; border-radius: 8px; max-width: 500px; width: 90%;';
+    dialog.innerHTML = `
+      <h3 style="margin-bottom: 20px; font-size: 18px; font-weight: bold;">Přeplánovat operaci</h3>
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Nový začátek:</label>
+        <input type="datetime-local" id="reschedule-start" value="${currentStart}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+      </div>
+      <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Nový konec:</label>
+        <input type="datetime-local" id="reschedule-end" value="${currentEnd}" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button id="reschedule-cancel" style="padding: 8px 16px; border: 1px solid #ccc; background: white; border-radius: 4px; cursor: pointer;">Zrušit</button>
+        <button id="reschedule-confirm" style="padding: 8px 16px; background: #E00034; color: white; border: none; border-radius: 4px; cursor: pointer;">Přeplánovat</button>
+      </div>
+    `;
+    
+    modal.appendChild(dialog);
+    document.body.appendChild(modal);
+    
+    return new Promise((resolve) => {
+      const cancelBtn = dialog.querySelector('#reschedule-cancel');
+      const confirmBtn = dialog.querySelector('#reschedule-confirm');
+      const startInput = dialog.querySelector('#reschedule-start');
+      const endInput = dialog.querySelector('#reschedule-end');
+      
+      const cleanup = () => {
+        document.body.removeChild(modal);
+        resolve(false);
+      };
+      
+      cancelBtn.onclick = cleanup;
+      modal.onclick = (e) => {
+        if (e.target === modal) cleanup();
+      };
+      
+      confirmBtn.onclick = async () => {
+        const newStart = startInput.value;
+        const newEnd = endInput.value;
+        
+        if (!newStart || !newEnd) {
+          alert('Musíte zadat nový začátek i konec operace');
+          return;
+        }
+
+        const scheduledStart = new Date(newStart).toISOString();
+        const scheduledEnd = new Date(newEnd).toISOString();
+
+        if (scheduledEnd <= scheduledStart) {
+          alert('Konec operace musí být po začátku');
+          return;
+        }
+
+        document.body.removeChild(modal);
+        resolve({ scheduledStart, scheduledEnd });
+      };
+    }).then(async (result) => {
+      if (!result) return;
+      
+      setActionLoading(true);
+      try {
+        await api.operations.update(operationId, {
+          scheduled_start: result.scheduledStart,
+          scheduled_end: result.scheduledEnd
+        });
+        await fetchOperationDetails();
+        if (onOperationUpdate) {
+          await onOperationUpdate();
+        }
+        alert('Operace byla úspěšně přeplánována!');
+      } catch (err) {
+        console.error('Error rescheduling operation:', err);
+        alert('Chyba při přeplánování operace: ' + (err.message || 'Neznámá chyba'));
+      } finally {
+        setActionLoading(false);
+      }
+    });
   };
 
   const formatDateTime = (dateString) => {
@@ -167,6 +345,7 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
   if (!isOpen) return null;
 
   return (
+    <>
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Background overlay */}
@@ -406,6 +585,90 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
                   </div>
                 </div>
 
+                {/* Tools and Materials Section - For Nurse */}
+                {isNurse && costSummary && (costSummary.tools_details?.length > 0 || costSummary.materials_details?.length > 0) && (
+                  <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                    <div className="flex items-center mb-6">
+                      <div className="bg-teal-100 rounded-full p-2 mr-3">
+                        <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                        </svg>
+                      </div>
+                      <h3 className="text-lg font-semibold text-black">Nástroje a materiály</h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Tools */}
+                      {costSummary.tools_details?.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-teal-800 mb-3 flex items-center">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+                            </svg>
+                            Nástroje
+                          </h4>
+                          <div className="space-y-2">
+                            {costSummary.tools_details.map((tool, index) => (
+                              <div key={index} className="bg-teal-50 rounded-lg p-3 border border-teal-200">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-black">{tool.name}</p>
+                                    <p className="text-xs text-teal-700 mt-1">{tool.category}</p>
+                                  </div>
+                                  <div className="text-right ml-2">
+                                    <p className="text-sm font-semibold text-black">{tool.quantity}x</p>
+                                    <p className="text-xs text-gray-600">{tool.total_cost.toLocaleString('cs-CZ')} Kč</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            <div className="bg-teal-100 rounded-lg p-3 border-2 border-teal-300 mt-3">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-semibold text-teal-900">Celkem nástroje</span>
+                                <span className="text-sm font-bold text-teal-900">{costSummary.tools_cost.toLocaleString('cs-CZ')} Kč</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Materials */}
+                      {costSummary.materials_details?.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-semibold text-teal-800 mb-3 flex items-center">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                            Materiály
+                          </h4>
+                          <div className="space-y-2">
+                            {costSummary.materials_details.map((material, index) => (
+                              <div key={index} className="bg-teal-50 rounded-lg p-3 border border-teal-200">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-black">{material.material_name}</p>
+                                    <p className="text-xs text-teal-700 mt-1">{material.material_category}</p>
+                                  </div>
+                                  <div className="text-right ml-2">
+                                    <p className="text-sm font-semibold text-black">{material.quantity_used}x</p>
+                                    <p className="text-xs text-gray-600">{material.cost.toLocaleString('cs-CZ')} Kč</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            <div className="bg-teal-100 rounded-lg p-3 border-2 border-teal-300 mt-3">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-semibold text-teal-900">Celkem materiály</span>
+                                <span className="text-sm font-bold text-teal-900">{costSummary.materials_cost.toLocaleString('cs-CZ')} Kč</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Time Information - Bottom Section */}
                 {(operation.scheduled_start || operation.actual_start) && (
                   <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
@@ -529,20 +792,94 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
                   </button>
                 </>
               )}
+
+              {/* Admin může zrušit a přeplánovat schválené/naplánované operace */}
+              {isAdmin && operation && (operation.status === 'approved' || operation.status === 'scheduled') && (
+                <>
+                  <button
+                    onClick={handleRescheduleOperation}
+                    disabled={actionLoading}
+                    className="px-6 py-2 text-white rounded-lg transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    style={{ backgroundColor: '#A11D30' }}
+                  >
+                    {actionLoading ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Přeplánovávám...
+                      </>
+                    ) : (
+                      <>
+                        📅 Přeplánovat operaci
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleCancelOperation}
+                    disabled={actionLoading}
+                    className="px-6 py-2 text-white rounded-lg transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    style={{ backgroundColor: '#A11D30' }}
+                  >
+                    {actionLoading ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Ruším...
+                      </>
+                    ) : (
+                      <>
+                        ❌ Zrušit operaci
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
               
               {/* Sestra může upravit operaci (doplnit parametry) */}
               {isNurse && operation && (operation.status === 'approved' || operation.status === 'scheduled') && (
-                <button
-                  onClick={handleEditOperation}
-                  disabled={actionLoading}
-                  className="px-6 py-2 text-white rounded-lg hover:opacity-95 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
-                  style={{ backgroundColor: '#A11D30' }}
-                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
-                  ✏️ Upravit operaci
-                </button>
+                <>
+                  <button
+                    onClick={handleEditOperation}
+                    disabled={actionLoading}
+                    className="px-6 py-2 text-white rounded-lg hover:opacity-95 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+                    style={{ backgroundColor: '#A11D30' }}
+                   >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Upravit operaci
+                  </button>
+                  
+                  {/* Tlačítko pro dokončení přípravy - zobrazí se když je přiřazen lékařský tým */}
+                  {operation.primary_doctor && operation.status !== 'in_progress' && operation.status !== 'completed' && (
+                    <button
+                      onClick={handleCompletePreparation}
+                      disabled={actionLoading}
+                      className="px-6 py-2 text-white rounded-lg hover:opacity-95 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 bg-green-600"
+                     >
+                      {actionLoading ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Dokončuji...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Dokončit přípravu operace
+                        </>
+                      )}
+                    </button>
+                  )}
+                </>
               )}
             </div>
             
@@ -557,5 +894,18 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
          </div>
        </div>
      </div>
+
+     <EditOperationModal
+       open={editModalOpen}
+       onClose={handleEditModalClose}
+       operation={operation}
+       onUpdate={async () => {
+         await fetchOperationDetails();
+         if (onOperationUpdate) {
+           await onOperationUpdate();
+         }
+       }}
+     />
+    </>
    );
- }
+}

@@ -2,7 +2,7 @@
  * FHIR Client - Knihovna pro komunikaci s FHIR serverem
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const USE_PROXY = API_BASE_URL.startsWith('/api/proxy');
 
 // Helper pro vytvoření URL s případným přesměrováním přes proxy
@@ -19,7 +19,7 @@ function makeApiUrl(path) {
  */
 export async function fetchPatientsFromBackend() {
   try {
-    const response = await fetch(makeApiUrl('/api/medic/fhir/patients/'));
+    const response = await fetch(makeApiUrl('/medic/fhir/patients/'));
     if (!response.ok) {
       throw new Error('Failed to fetch patients from backend');
     }
@@ -37,7 +37,7 @@ export async function searchPatients(params = {}) {
   try {
     const queryString = new URLSearchParams(params).toString();
     const response = await fetch(
-      makeApiUrl(`/api/medic/fhir/patients/search/?${queryString}`)
+      makeApiUrl(`/medic/fhir/patients/search/?${queryString}`)
     );
     if (!response.ok) {
       throw new Error('Failed to search patients');
@@ -55,7 +55,7 @@ export async function searchPatients(params = {}) {
 export async function generatePatients(count = 50) {
   try {
     const response = await fetch(
-      makeApiUrl('/api/medic/fhir/patients/generate/'),
+      makeApiUrl('/medic/fhir/patients/generate/'),
       {
         method: 'POST',
         headers: {
@@ -80,7 +80,7 @@ export async function generatePatients(count = 50) {
 export async function syncPatientsFromFHIR() {
   try {
     const response = await fetch(
-      makeApiUrl('/api/medic/fhir/patients/sync_from_fhir/'),
+      makeApiUrl('/medic/fhir/patients/sync_from_fhir/'),
       {
         method: 'POST',
         headers: {
@@ -103,7 +103,7 @@ export async function syncPatientsFromFHIR() {
  */
 export async function fetchPractitionersFromBackend() {
   try {
-    const response = await fetch(makeApiUrl('/api/medic/fhir/practitioners/'));
+    const response = await fetch(makeApiUrl('/medic/fhir/practitioners/'));
     if (!response.ok) {
       throw new Error('Failed to fetch practitioners from backend');
     }
@@ -121,7 +121,7 @@ export async function searchPractitioners(params = {}) {
   try {
     const queryString = new URLSearchParams(params).toString();
     const response = await fetch(
-      makeApiUrl(`/api/medic/fhir/practitioners/search/?${queryString}`)
+      makeApiUrl(`/medic/fhir/practitioners/search/?${queryString}`)
     );
     if (!response.ok) {
       throw new Error('Failed to search practitioners');
@@ -138,7 +138,7 @@ export async function searchPractitioners(params = {}) {
  */
 export async function fetchLocationsFromBackend() {
   try {
-    const response = await fetch(makeApiUrl('/api/medic/fhir/locations/'));
+    const response = await fetch(makeApiUrl('/medic/fhir/locations/'));
     if (!response.ok) {
       throw new Error('Failed to fetch locations from backend');
     }
@@ -155,7 +155,7 @@ export async function fetchLocationsFromBackend() {
 export async function syncAllRoomsToFHIR() {
   try {
     const response = await fetch(
-      makeApiUrl('/api/medic/fhir/locations/sync_all_to_fhir/'),
+      makeApiUrl('/medic/fhir/locations/sync_all_to_fhir/'),
       {
         method: 'POST',
         headers: {
@@ -180,7 +180,7 @@ export async function searchProcedures(params = {}) {
   try {
     const queryString = new URLSearchParams(params).toString();
     const response = await fetch(
-      makeApiUrl(`/api/medic/fhir/procedures/search/?${queryString}`)
+      makeApiUrl(`/medic/fhir/procedures/search/?${queryString}`)
     );
     if (!response.ok) {
       throw new Error('Failed to search procedures');
@@ -198,7 +198,7 @@ export async function searchProcedures(params = {}) {
 export async function syncOperationToFHIR(operationId) {
   try {
     const response = await fetch(
-      makeApiUrl(`/api/medic/fhir/procedures/${operationId}/sync_to_fhir/`),
+      makeApiUrl(`/medic/fhir/procedures/${operationId}/sync_to_fhir/`),
       {
         method: 'POST',
         headers: {
@@ -223,7 +223,7 @@ export async function searchDevices(params = {}) {
   try {
     const queryString = new URLSearchParams(params).toString();
     const response = await fetch(
-      makeApiUrl(`/api/medic/fhir/devices/search/?${queryString}`)
+      makeApiUrl(`/medic/fhir/devices/search/?${queryString}`)
     );
     if (!response.ok) {
       throw new Error('Failed to search devices');
@@ -241,7 +241,7 @@ export async function searchDevices(params = {}) {
 export async function getFHIRServerMetadata() {
   try {
     const response = await fetch(
-      makeApiUrl('/api/medic/fhir/server/metadata/')
+      makeApiUrl('/medic/fhir/server/metadata/')
     );
     if (!response.ok) {
       throw new Error('Failed to get FHIR server metadata');
@@ -259,7 +259,7 @@ export async function getFHIRServerMetadata() {
 export async function checkFHIRServerStatus() {
   try {
     const response = await fetch(
-      makeApiUrl('/api/medic/fhir/server/status/')
+      makeApiUrl('/medic/fhir/server/status/')
     );
     if (!response.ok) {
       throw new Error('Failed to check FHIR server status');

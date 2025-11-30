@@ -55,7 +55,7 @@ const nextConfig = {
     ];
   },
   
-  // Environment variables
+  // Environment variables - POZOR: Tyto se musí nastavit během build fáze!
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   },

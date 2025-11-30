@@ -385,15 +385,19 @@ class PerioperativeProtocol(TimeStampedModel):
     # Použitý materiál
     materials_used = models.ManyToManyField(Material, through='MaterialUsage')
     
+    # Použité nástroje
+    tools_used = models.ManyToManyField('OperationTool', through='ToolUsage')
+    
     # Záznamy z operace
     complications = models.TextField(blank=True)
-    procedure_notes = models.TextField()
-    anesthesia_type = models.CharField(max_length=100)
+    procedure_notes = models.TextField(blank=True)
+    anesthesia_type = models.CharField(max_length=100, blank=True)
     
     # Náklady
     total_staff_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_equipment_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_material_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_tools_cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     
     class Meta:
         db_table = 'perioperative_protocols'
@@ -404,7 +408,8 @@ class PerioperativeProtocol(TimeStampedModel):
     @property
     def total_cost(self):
         """Celkové náklady operace"""
-        return self.total_staff_cost + self.total_equipment_cost + self.total_material_cost
+        return (self.total_staff_cost + self.total_equipment_cost + 
+                self.total_material_cost + self.total_tools_cost)
 
 
 class EquipmentUsage(TimeStampedModel):
@@ -474,3 +479,17 @@ class OperationTool(TimeStampedModel):
     def is_low_stock(self):
         """Zkontroluje, zda je zásoba nízká"""
         return self.quantity < 10
+
+
+class ToolUsage(TimeStampedModel):
+    """Záznam o použití nástroje během operace"""
+    protocol = models.ForeignKey(PerioperativeProtocol, on_delete=models.CASCADE)
+    tool = models.ForeignKey(OperationTool, on_delete=models.PROTECT)
+    quantity_used = models.IntegerField(default=1)
+    cost = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    class Meta:
+        db_table = 'tool_usage'
+    
+    def __str__(self):
+        return f"{self.tool} - {self.quantity_used}x"

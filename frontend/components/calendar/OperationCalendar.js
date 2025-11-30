@@ -21,6 +21,14 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
   const isDoctor = currentRole === 'doctor';
   const [columnWidths, setColumnWidths] = useState({});
   const [columnCount, setColumnCount] = useState(0);
+  const [dismissedOperations, setDismissedOperations] = useState(() => {
+    // Load dismissed operations from localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dismissedOperations');
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
   const dragStateRef = useRef({
     isDragging: false,
     startX: 0,
@@ -61,10 +69,11 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     }
   };
 
-  // Filter operations by selected room
-  const filteredOperations = selectedRoom 
+  // Filter operations by selected room and dismissed operations
+  const filteredOperations = (selectedRoom 
     ? operations.filter(op => op.room?.id === selectedRoom)
-    : operations;
+    : operations
+  ).filter(op => !dismissedOperations.includes(op.id));
 
   const getColumnWidth = useCallback((index) => {
     // v měsíčním zobrazení použijeme větší výchozí šířku
@@ -285,6 +294,20 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     };
   }, []);
 
+  // Refresh calendar when dismissed operations change
+  useEffect(() => {
+    if (calendarRef.current) {
+      const calendarApi = calendarRef.current.getApi();
+      // Remove all events that are in dismissedOperations
+      dismissedOperations.forEach(dismissedId => {
+        const event = calendarApi.getEventById(String(dismissedId));
+        if (event) {
+          event.remove();
+        }
+      });
+    }
+  }, [dismissedOperations]);
+
   // Transform operations data for FullCalendar
   const events = filteredOperations.map(op => {
     const isHighlighted = highlightedOperationId && op.id === highlightedOperationId;
@@ -295,9 +318,13 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     if (isPast && op.status !== 'completed' && op.status !== 'cancelled') {
       className += ' past-operation';
     }
+    // Přidat třídu pro zrušené operace
+    if (op.status === 'cancelled') {
+      className += ' cancelled-operation';
+    }
     
     return {
-      id: op.id,
+      id: String(op.id),
       title: `${op.type} - ${op.patient?.name || 'Pacient'}`,
       start: op.scheduledStart,
       end: op.scheduledEnd,
@@ -371,6 +398,26 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     overflow: 'hidden'
   });
 
+  const handleDismissOperation = (operationId, e) => {
+    e.stopPropagation(); // Prevent event click from firing
+    // operationId from event.id is a string, but we need to store the numeric ID
+    const numericId = typeof operationId === 'string' ? parseInt(operationId, 10) : operationId;
+    const newDismissed = [...dismissedOperations, numericId];
+    setDismissedOperations(newDismissed);
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dismissedOperations', JSON.stringify(newDismissed));
+    }
+    // Immediately remove the event from the calendar
+    if (calendarRef.current) {
+      const calendarApi = calendarRef.current.getApi();
+      const event = calendarApi.getEventById(String(operationId));
+      if (event) {
+        event.remove();
+      }
+    }
+  };
+
   const renderEventContent = (arg) => {
     // sanitize title + other text parts to remove emojis
     const title = stripEmojis(arg.event.title || '');
@@ -378,26 +425,49 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
     const isHighlighted = arg.event.extendedProps.isHighlighted;
     const isPast = arg.event.extendedProps.isPast;
     const status = arg.event.extendedProps.status;
+    const operationId = arg.event.id;
     
     // Status emoji
     let statusEmoji = '';
     if (status === 'completed') statusEmoji = '✅';
     else if (status === 'in_progress') statusEmoji = '⏱️';
-    else if (status === 'cancelled') statusEmoji = '❌';
-    else if (isPast && status !== 'completed') statusEmoji = '⚠️';
+    // Removed ❌ emoji for cancelled operations
+    else if (isPast && status !== 'completed' && status !== 'cancelled') statusEmoji = '⚠️';
 
     
+    const isCancelled = status === 'cancelled';
+    const paddingClass = isCancelled ? 'p-0.5' : 'p-1';
+    const textSizeClass = isCancelled ? 'text-[11px]' : 'text-[15px]';
+    const titleSizeClass = isCancelled ? 'text-[11px]' : 'text-[15px]';
+    
     return (
-      <div className={`p-1 leading-snug space-y-0.5 text-[15px] ${isHighlighted ? 'text-white animate-pulse' : 'text-gray-900'} ${isPast && status !== 'completed' ? 'opacity-60' : ''}`}>
-        <div className="font-semibold text-[15px] truncate">
+      <div className={`${paddingClass} leading-snug space-y-0.5 ${textSizeClass} ${isHighlighted ? 'text-white animate-pulse' : 'text-gray-900'} ${isPast && status !== 'completed' ? 'opacity-60' : ''} relative`}>
+        {isCancelled && (
+          <button
+            onClick={(e) => handleDismissOperation(operationId, e)}
+            className="absolute top-0 right-0 m-0.5 p-0.5 rounded hover:bg-black/20 transition-colors"
+            title="Skrýt operaci"
+            aria-label="Skrýt operaci"
+          >
+            <svg 
+              className={`${isCancelled ? 'w-3 h-3' : 'w-4 h-4'} text-[#E00034]`}
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+        <div className={`font-semibold ${titleSizeClass} truncate ${isCancelled ? 'pr-4' : ''}`}>
           {arg.timeText} {statusEmoji}
         </div>
-        <div className="font-semibold whitespace-normal break-words" style={clampStyle(2)}>
+        <div className={`font-semibold whitespace-normal break-words ${isCancelled ? 'text-[10px]' : ''}`} style={clampStyle(isCancelled ? 1 : 2)}>
           {title}
           {isHighlighted && ' 📍'}
         </div>
         {roomName && (
-          <div className="text-[14px] opacity-80 whitespace-normal break-words" style={clampStyle(2)}>
+          <div className={`${isCancelled ? 'text-[9px]' : 'text-[14px]'} opacity-80 whitespace-normal break-words`} style={clampStyle(isCancelled ? 1 : 2)}>
             {roomName}
           </div>
         )}
@@ -513,6 +583,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
             <LegendItem color="#3b82f6" label="Probíhá" />
             <LegendItem color="#10b981" label="Dokončeno" />
             <LegendItem color="#dc2626" label="Urgentní" />
+            <LegendItem color="#6b7280" label="Zrušené" />
           </div>
         </div>
       </div>
@@ -523,6 +594,7 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
         className="calendar-container overflow-x-auto"
       >
         <FullCalendar
+          key={`calendar-${dismissedOperations.length}`}
           ref={calendarRef}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin, listPlugin]}
           initialView={view}
@@ -654,6 +726,22 @@ export default function OperationCalendar({ operations = [], rooms = [], onEvent
         }
         .calendar-container .fc-daygrid-event {
           margin: 1px 2px;
+        }
+        /* Make cancelled operations smaller */
+        .calendar-container .fc-event.cancelled-operation {
+          min-height: 20px !important;
+          height: auto !important;
+          font-size: 11px !important;
+        }
+        .calendar-container .fc-event.cancelled-operation .fc-event-main {
+          padding: 2px 4px !important;
+        }
+        .calendar-container .fc-timegrid-event.cancelled-operation {
+          min-height: 20px !important;
+          font-size: 11px !important;
+        }
+        .calendar-container .fc-timegrid-event.cancelled-operation .fc-event-main {
+          padding: 2px 4px !important;
         }
         .calendar-container .fc .fc-daygrid,
         .calendar-container .fc .fc-daygrid table {
