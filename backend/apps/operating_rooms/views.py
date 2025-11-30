@@ -301,8 +301,17 @@ class OperationViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """Vytvoření nové operace - pouze pro doktory"""
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"CREATE OPERATION: User={request.user}, Type={type(request.user)}")
+        logger.info(f"Has profile: {hasattr(request.user, 'profile')}")
+        if hasattr(request.user, 'profile'):
+            logger.info(f"Profile role: {request.user.profile.role}")
+        
         # Kontrola, že uživatel je doktor
         if not hasattr(request.user, 'profile') or request.user.profile.role != 'doctor':
+            logger.warning(f"403 - User denied: has_profile={hasattr(request.user, 'profile')}, role={request.user.profile.role if hasattr(request.user, 'profile') else 'NO PROFILE'}")
             return Response(
                 {'error': 'Pouze doktoři mohou vytvářet operace'},
                 status=status.HTTP_403_FORBIDDEN

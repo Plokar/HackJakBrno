@@ -18,6 +18,7 @@ class ApiClient {
    * Nastavit aktuální roli uživatele pro mock autentizaci
    */
   setUserRole(role) {
+    console.log(`[API] Nastavuji roli na: ${role}`);
     this.currentRole = role;
   }
 
@@ -38,6 +39,9 @@ class ApiClient {
       },
       ...options,
     };
+
+    // Debug logging - kontrola role
+    console.log(`[API] Request: ${options.method || 'GET'} ${endpoint}, Role: ${this.currentRole}`);
 
     // Timeout implementace
     const controller = new AbortController();
@@ -134,12 +138,12 @@ class ApiClient {
    * Operating Rooms API
    */
   operatingRooms = {
-    list: () => this.get('/api/medic/rooms/'),
-    get: (id) => this.get(`/api/medic/rooms/${id}/`),
+    list: () => this.get('/medic/rooms/'),
+    get: (id) => this.get(`/medic/rooms/${id}/`),
     getSchedule: (id, date = null) => 
-      this.get(`/api/medic/rooms/${id}/schedule/`, date ? { date } : {}),
+      this.get(`/medic/rooms/${id}/schedule/`, date ? { date } : {}),
     getUtilization: (id, days = 30) => 
-      this.get(`/api/medic/rooms/${id}/utilization/`, { days }),
+      this.get(`/medic/rooms/${id}/utilization/`, { days }),
   };
 
   /**
