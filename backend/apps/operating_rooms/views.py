@@ -782,6 +782,176 @@ class DashboardViewSet(viewsets.ViewSet):
         }
         
         return Response(data)
+    
+    @action(detail=False, methods=['get'], url_path='analytics/room-utilization')
+    def room_utilization_analytics(self, request):
+        """Analytika vytížení sálů v čase"""
+        days = int(request.query_params.get('days', 30))
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=days)
+        
+        rooms = OperatingRoom.objects.filter(is_active=True)
+        data = []
+        
+        for room in rooms:
+            operations = Operation.objects.filter(
+                operating_room=room,
+                scheduled_start__date__gte=start_date,
+                scheduled_start__date__lte=end_date
+            )
+            
+            total_operations = operations.count()
+            completed = operations.filter(status='completed').count()
+            total_hours = sum(op.duration_hours for op in operations if op.duration_hours)
+            avg_duration = total_hours / total_operations if total_operations > 0 else 0
+            
+            data.append({
+                'room_name': room.name,
+                'room_number': room.room_number,
+                'total_operations': total_operations,
+                'completed_operations': completed,
+                'total_hours': round(total_hours, 2),
+                'avg_duration_hours': round(avg_duration, 2),
+                'utilization_percent': round((total_hours / (days * 24)) * 100, 2) if days > 0 else 0
+            })
+        
+        return Response(data)
+    
+    @action(detail=False, methods=['get'], url_path='analytics/operation-types')
+    def operation_types_analytics(self, request):
+        """Analytika typů operací"""
+        days = int(request.query_params.get('days', 30))
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=days)
+        
+        operations = Operation.objects.filter(
+            scheduled_start__date__gte=start_date,
+            scheduled_start__date__lte=end_date
+        )
+        
+        type_counts = operations.values('operation_type').annotate(
+            count=Count('id'),
+            total_hours=Sum('duration_hours')
+        ).order_by('-count')
+        
+        data = [
+            {
+                'type': item['operation_type'],
+                'count': item['count'],
+                'total_hours': round(item['total_hours'] or 0, 2)
+            }
+            for item in type_counts
+        ]
+        
+        return Response(data)
+    
+    @action(detail=False, methods=['get'], url_path='analytics/operations-by-status')
+    def operations_by_status(self, request):
+        """Analytika operací podle statusu"""
+        days = int(request.query_params.get('days', 30))
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=days)
+        
+        operations = Operation.objects.filter(
+            scheduled_start__date__gte=start_date,
+            scheduled_start__date__lte=end_date
+        )
+        
+        status_counts = operations.values('status').annotate(count=Count('id'))
+        
+        status_labels = {
+            'draft': 'Návrh',
+            'pending_approval': 'Čeká na schválení',
+            'approved': 'Schváleno',
+            'scheduled': 'Naplánováno',
+            'in_progress': 'Probíhá',
+            'completed': 'Dokončeno',
+            'cancelled': 'Zrušeno'
+        }
+        
+        data = [
+            {
+                'status': item['status'],
+                'label': status_labels.get(item['status'], item['status']),
+                'count': item['count']
+            }
+            for item in status_counts
+        ]
+        
+        return Response(data)
+    
+    @action(detail=False, methods=['get'], url_path='analytics/operations-timeline')
+    def operations_timeline(self, request):
+        """Časová osa operací - denní/denní agregace"""
+        days = int(request.query_params.get('days', 30))
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=days)
+        
+        operations = Operation.objects.filter(
+            scheduled_start__date__gte=start_date,
+            scheduled_start__date__lte=end_date
+        )
+        
+        # Agregace po dnech
+        daily_data = {}
+        current_date = start_date
+        while current_date <= end_date:
+            daily_data[current_date.isoformat()] = {
+                'date': current_date.isoformat(),
+                'total': 0,
+                'completed': 0,
+                'cancelled': 0
+            }
+            current_date += timedelta(days=1)
+        
+        for op in operations:
+            date_key = op.scheduled_start.date().isoformat() if op.scheduled_start else None
+            if date_key and date_key in daily_data:
+                daily_data[date_key]['total'] += 1
+                if op.status == 'completed':
+                    daily_data[date_key]['completed'] += 1
+                elif op.status == 'cancelled':
+                    daily_data[date_key]['cancelled'] += 1
+        
+        data = list(daily_data.values())
+        return Response(data)
+    
+    @action(detail=False, methods=['get'], url_path='analytics/doctors-performance')
+    def doctors_performance(self, request):
+        """Výkonnost doktorů"""
+        days = int(request.query_params.get('days', 30))
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=days)
+        
+        operations = Operation.objects.filter(
+            scheduled_start__date__gte=start_date,
+            scheduled_start__date__lte=end_date,
+            primary_doctor__isnull=False
+        )
+        
+        doctor_stats = operations.values(
+            'primary_doctor__id',
+            'primary_doctor__first_name',
+            'primary_doctor__last_name'
+        ).annotate(
+            total_operations=Count('id'),
+            completed_operations=Count('id', filter=Q(status='completed')),
+            total_hours=Sum('duration_hours')
+        ).order_by('-total_operations')
+        
+        data = [
+            {
+                'doctor_id': item['primary_doctor__id'],
+                'doctor_name': f"Dr. {item['primary_doctor__first_name']} {item['primary_doctor__last_name']}",
+                'total_operations': item['total_operations'],
+                'completed_operations': item['completed_operations'],
+                'total_hours': round(item['total_hours'] or 0, 2),
+                'avg_duration': round((item['total_hours'] or 0) / item['total_operations'], 2) if item['total_operations'] > 0 else 0
+            }
+            for item in doctor_stats
+        ]
+        
+        return Response(data)
 
 
 class OperationToolViewSet(viewsets.ModelViewSet):
