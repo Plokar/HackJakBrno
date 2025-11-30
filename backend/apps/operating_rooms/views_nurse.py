@@ -391,15 +391,11 @@ class OperationNurseViewSet(mixins.RetrieveModelMixin,
     
     def _get_materials_details(self, protocol):
         """Získat detaily použitých materiálů"""
-        usages = MaterialUsage.objects.filter(protocol=protocol)
-        serializer = MaterialUsageDetailSerializer(usages, many=True)
-        return serializer.data
+        return list(MaterialUsage.objects.filter(protocol=protocol))
     
     def _get_equipment_details(self, protocol):
         """Získat detaily použitých přístrojů"""
-        usages = EquipmentUsage.objects.filter(protocol=protocol)
-        serializer = EquipmentUsageDetailSerializer(usages, many=True)
-        return serializer.data
+        return list(EquipmentUsage.objects.filter(protocol=protocol))
     
     @action(detail=True, methods=['delete'], url_path='remove-tool/(?P<tool_usage_id>[^/.]+)')
     def remove_tool(self, request, pk=None, tool_usage_id=None):
