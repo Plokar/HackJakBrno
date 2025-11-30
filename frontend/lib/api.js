@@ -180,6 +180,8 @@ class ApiClient {
     delete: (id) => this.delete(`/medic/patients/${id}/`),
     getOperations: (id) => this.get(`/medic/patients/${id}/operations/`),
     searchByBirthNumber: (birthNumber) => this.get('/medic/patients/search_by_birth_number/', { birth_number: birthNumber }),
+    noteInsights: (id, payload) => this.post(`/medic/patients/${id}/note-insights/`, payload),
+    syncNotes: (id) => this.post(`/medic/patients/${id}/sync-notes/`, {}),
   };
 
   /**

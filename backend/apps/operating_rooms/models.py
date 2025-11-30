@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.contrib.postgres.fields import ArrayField
 from core.models import TimeStampedModel
 
 
@@ -373,6 +374,42 @@ class Operation(TimeStampedModel):
         self.fhir_last_synced = timezone.now()
         self.save(update_fields=['fhir_id', 'fhir_resource_json', 'fhir_last_synced'])
         return result
+
+
+class PatientClinicalNote(TimeStampedModel):
+    """Klinické poznámky načtené z FHIR DocumentReference"""
+    STATUS_CHOICES = [
+        ('pending', 'Čeká na zpracování'),
+        ('ready', 'Připraveno'),
+        ('failed', 'Chyba'),
+    ]
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='clinical_notes')
+    fhir_document_id = models.CharField(max_length=255)
+    source_resource_type = models.CharField(max_length=64, default='DocumentReference')
+    doc_status = models.CharField(max_length=64, blank=True)
+    category = models.CharField(max_length=128, blank=True)
+    author = models.CharField(max_length=255, blank=True)
+    indexed_at = models.DateTimeField(null=True, blank=True)
+    note_text = models.TextField()
+    note_hash = models.CharField(max_length=64, db_index=True)
+    embedding = ArrayField(models.FloatField(), null=True, blank=True)
+    embedding_model = models.CharField(max_length=128, blank=True)
+    embedding_last_updated = models.DateTimeField(null=True, blank=True)
+    source_reference = models.CharField(max_length=512, blank=True)
+    source_payload = models.JSONField(null=True, blank=True)
+    sync_status = models.CharField(max_length=16, choices=STATUS_CHOICES, default='pending')
+
+    class Meta:
+        db_table = 'patient_clinical_notes'
+        unique_together = ('patient', 'fhir_document_id')
+        indexes = [
+            models.Index(fields=('patient', 'sync_status'), name='patient_note_sync_idx'),
+            models.Index(fields=('patient', 'indexed_at'), name='patient_note_indexed_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.patient} - {self.category or 'Poznámka'}"
 
 
 class PerioperativeProtocol(TimeStampedModel):

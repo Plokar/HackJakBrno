@@ -24,7 +24,11 @@ class FHIRService:
     
     def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Optional[Dict]:
         """Provede HTTP request na FHIR server"""
-        url = f"{self.base_url}/{endpoint}"
+        if endpoint.startswith('http'):
+            url = endpoint
+        else:
+            base = self.base_url.rstrip('/')
+            url = f"{base}/{endpoint.lstrip('/')}"
         try:
             response = requests.request(
                 method=method,
@@ -158,6 +162,18 @@ class FHIRService:
     def create_supply_delivery(self, supply_data: Dict) -> Dict:
         """Vytvoří novou dodávku materiálu"""
         return self._make_request('POST', 'SupplyDelivery', supply_data)
+    
+    # ==================== DOCUMENT REFERENCE ====================
+    
+    def get_document_reference(self, fhir_id: str) -> Optional[Dict]:
+        """Načte DocumentReference resource"""
+        return self._make_request('GET', f'DocumentReference/{fhir_id}')
+    
+    def search_document_references(self, params: Optional[Dict] = None) -> Dict:
+        """Vyhledá DocumentReference resources podle parametrů"""
+        query_string = '&'.join([f"{k}={v}" for k, v in (params or {}).items()])
+        endpoint = f'DocumentReference?{query_string}' if query_string else 'DocumentReference'
+        return self._make_request('GET', endpoint)
     
     # ==================== APPOINTMENT OPERATIONS ====================
     

@@ -14,26 +14,96 @@ import {
   Paper,
   Chip,
   Alert,
-  CircularProgress
+  CircularProgress,
+  IconButton,
+  Tooltip
 } from '@mui/material';
+
+const BASE_ROLES = [
+  { key: 'anesthesiologist', label: 'Anesteziolog', chipColor: 'secondary' },
+  { key: 'primary', label: 'Primární lékař', chipColor: 'primary', showCostAlert: true },
+  { key: 'secondary', label: 'Sekundární lékař', chipColor: 'default' }
+];
+
+const ANESTHESIA_BUFFER_MINUTES = 15;
+
+const getAnesthesiaTimes = (scheduledStart, scheduledEnd) => {
+  if (!scheduledStart || !scheduledEnd) {
+    return { expectedStart: null, expectedEnd: null };
+  }
+
+  const start = new Date(scheduledStart);
+  const end = new Date(scheduledEnd);
+  const bufferMs = ANESTHESIA_BUFFER_MINUTES * 60 * 1000;
+
+  return {
+    expectedStart: new Date(start.getTime() - bufferMs),
+    expectedEnd: new Date(end.getTime() + bufferMs)
+  };
+};
+
+const buildInitialRoleAssignments = () =>
+  BASE_ROLES.reduce((acc, role) => {
+    acc[role.key] = null;
+    return acc;
+  }, {});
 
 export default function PersonnelTab({ operation, onUpdate, loading, costSummary }) {
   const [doctors, setDoctors] = useState([]);
-  const [primaryDoctor, setPrimaryDoctor] = useState(null);
-  const [assistingDoctors, setAssistingDoctors] = useState([]);
+  const [roleAssignments, setRoleAssignments] = useState(buildInitialRoleAssignments);
+  const [customRoles, setCustomRoles] = useState([]);
+  const [newRoleLabel, setNewRoleLabel] = useState('');
   const [loadingDoctors, setLoadingDoctors] = useState(false);
 
   useEffect(() => {
     loadDoctors();
-    if (operation) {
-      // Nastavit aktuální personál
-      if (operation.primary_doctor) {
-        setPrimaryDoctor(operation.primary_doctor);
-      }
-      if (operation.assisting_doctors) {
-        setAssistingDoctors(operation.assisting_doctors);
-      }
+  }, []);
+
+  useEffect(() => {
+    if (!operation) {
+      setRoleAssignments(buildInitialRoleAssignments());
+      setCustomRoles([]);
+      return;
     }
+
+    const baseAssignments = buildInitialRoleAssignments();
+    if (operation.primary_doctor) {
+      baseAssignments.primary = operation.primary_doctor;
+    }
+
+    let availableAssistants = Array.isArray(operation.assisting_doctors)
+      ? operation.assisting_doctors.filter(
+          (doctor) => doctor && doctor.id !== operation.primary_doctor?.id
+        )
+      : [];
+
+    const anesthesiologistIndex = availableAssistants.findIndex((doctor) => {
+      const specialization = doctor?.specialization?.toLowerCase() || '';
+      return specialization.includes('anest');
+    });
+
+    if (anesthesiologistIndex >= 0) {
+      baseAssignments.anesthesiologist = availableAssistants[anesthesiologistIndex];
+      availableAssistants.splice(anesthesiologistIndex, 1);
+    }
+
+    if (availableAssistants.length > 0) {
+      baseAssignments.secondary = availableAssistants[0];
+      availableAssistants = availableAssistants.slice(1);
+    }
+
+    const importedRoles = availableAssistants.map((doctor, index) => ({
+      key: `imported-${doctor.id}-${index}`,
+      label: `Další personál ${index + 1}`
+    }));
+
+    const importedAssignments = importedRoles.reduce((acc, role, idx) => {
+      acc[role.key] = availableAssistants[idx];
+      return acc;
+    }, {});
+
+    setCustomRoles(importedRoles);
+    setRoleAssignments({ ...baseAssignments, ...importedAssignments });
   }, [operation]);
 
   const loadDoctors = async () => {
@@ -51,45 +121,178 @@ export default function PersonnelTab({ operation, onUpdate, loading, costSummary
     }
   };
 
+  const handleRoleChange = (roleKey, doctor) => {
+    setRoleAssignments((prev) => {
+      const updated = { ...prev };
+
+      if (doctor) {
+        Object.keys(updated).forEach((key) => {
+          if (key !== roleKey && updated[key]?.id === doctor.id) {
+            updated[key] = null;
+          }
+        });
+      }
+
+      updated[roleKey] = doctor || null;
+      return updated;
+    });
+  };
+
+  const handleAddCustomRole = () => {
+    const trimmed = newRoleLabel.trim();
+    if (!trimmed) return;
+
+    const key = `custom-${Date.now()}`;
+    const newRole = { key, label: trimmed };
+
+    setCustomRoles((prev) => [...prev, newRole]);
+    setRoleAssignments((prev) => ({ ...prev, [key]: null }));
+    setNewRoleLabel('');
+  };
+
+  const handleRemoveCustomRole = (roleKey) => {
+    setCustomRoles((prev) => prev.filter((role) => role.key !== roleKey));
+    setRoleAssignments((prev) => {
+      const updated = { ...prev };
+      delete updated[roleKey];
+      return updated;
+    });
+  };
+
   const handleSave = () => {
+    const primaryDoctor = roleAssignments.primary;
+    const assistingDoctorIds = Object.entries(roleAssignments)
+      .filter(([roleKey, doctor]) => roleKey !== 'primary' && doctor?.id)
+      .map(([, doctor]) => doctor.id);
+
+    const uniqueAssistingIds = Array.from(new Set(assistingDoctorIds));
+
     const personnelData = {
       primary_doctor_id: primaryDoctor?.id || null,
-      assisting_doctor_ids: assistingDoctors.map(d => d.id)
+      assisting_doctor_ids: uniqueAssistingIds
     };
+
     onUpdate(personnelData);
   };
 
-  // Výpočet nákladů na personál přímo v komponentě
-  const calculatePersonnelCost = (doctor, role) => {
-    if (!operation.scheduled_start || !operation.scheduled_end) return 0;
-    
+  const anesthesiaTimes = getAnesthesiaTimes(operation?.scheduled_start, operation?.scheduled_end);
+
+  const formatTime = (date) =>
+    date ? date.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' }) : 'N/A';
+
+  const calculatePersonnelCost = (doctor) => {
+    if (!doctor || !operation?.scheduled_start || !operation?.scheduled_end) return 0;
+
     const start = new Date(operation.scheduled_start);
     const end = new Date(operation.scheduled_end);
-    const hours = (end - start) / (1000 * 60 * 60); // Převod na hodiny
-    
-    return doctor.hourly_rate * hours;
+    const hours = (end - start) / (1000 * 60 * 60);
+
+    return Number(doctor.hourly_rate || 0) * hours;
   };
 
-  const getTotalPersonnelCost = () => {
-    let total = 0;
-    
-    if (primaryDoctor) {
-      total += calculatePersonnelCost(primaryDoctor, 'primary');
-    }
-    
-    assistingDoctors.forEach(doctor => {
-      total += calculatePersonnelCost(doctor, 'assisting');
+  const getUniqueAssignedDoctors = () => {
+    const seen = new Set();
+    const unique = [];
+
+    Object.values(roleAssignments).forEach((doctor) => {
+      if (doctor?.id && !seen.has(doctor.id)) {
+        seen.add(doctor.id);
+        unique.push(doctor);
+      }
     });
-    
-    return total;
+
+    return unique;
   };
+
+  const getTotalPersonnelCost = () =>
+    getUniqueAssignedDoctors().reduce((total, doctor) => total + calculatePersonnelCost(doctor), 0);
 
   const getOperationDuration = () => {
-    if (!operation.scheduled_start || !operation.scheduled_end) return 0;
+    if (!operation?.scheduled_start || !operation?.scheduled_end) return 0;
     const start = new Date(operation.scheduled_start);
     const end = new Date(operation.scheduled_end);
     return (end - start) / (1000 * 60 * 60);
   };
+
+  const doctorOptionLabel = (option) => {
+    if (!option) return '';
+    const specialization = option.specialization || 'Bez specializace';
+    const hourlyRate = option.hourly_rate ?? 0;
+    return `Dr. ${option.first_name} ${option.last_name} - ${specialization} (${hourlyRate} Kč/hod)`;
+  };
+
+  const renderRoleField = (role, { removable = false } = {}) => (
+    <Box key={role.key} sx={{ mb: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+        <Typography variant="subtitle1">{role.label}</Typography>
+        {removable && (
+          <Tooltip title="Odebrat roli" arrow>
+            <IconButton
+              size="small"
+              aria-label={`Odebrat roli ${role.label}`}
+              onClick={() => handleRemoveCustomRole(role.key)}
+            >
+              ×
+            </IconButton>
+          </Tooltip>
+        )}
+      </Box>
+      <Autocomplete
+        options={doctors}
+        getOptionLabel={doctorOptionLabel}
+        isOptionEqualToValue={(option, value) => option.id === value?.id}
+        value={roleAssignments[role.key] || null}
+        onChange={(event, newValue) => handleRoleChange(role.key, newValue)}
+        loading={loadingDoctors}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label={`Vyberte ${role.label.toLowerCase()}`}
+            variant="outlined"
+            InputProps={{
+              ...params.InputProps,
+              endAdornment: (
+                <>
+                  {loadingDoctors ? <CircularProgress color="inherit" size={20} /> : null}
+                  {params.InputProps.endAdornment}
+                </>
+              )
+            }}
+          />
+        )}
+      />
+      {role.showCostAlert &&
+        roleAssignments[role.key] &&
+        operation?.scheduled_start &&
+        operation?.scheduled_end && (
+          <Alert severity="info" sx={{ mt: 1 }}>
+            Odhadované náklady:{' '}
+            {calculatePersonnelCost(roleAssignments[role.key]).toLocaleString('cs-CZ')} Kč
+            <br />
+            <Typography variant="caption">
+              (Délka operace: {getOperationDuration().toFixed(2)} hod ×{' '}
+              {roleAssignments[role.key].hourly_rate} Kč/hod)
+            </Typography>
+          </Alert>
+        )}
+    </Box>
+  );
+
+  const assignedDoctorEntries = Object.entries(roleAssignments)
+    .map(([roleKey, doctor]) => {
+      if (!doctor) return null;
+      const baseRole = BASE_ROLES.find((role) => role.key === roleKey);
+      const customRole = customRoles.find((role) => role.key === roleKey);
+      return {
+        roleKey,
+        roleLabel: baseRole?.label || customRole?.label || roleKey,
+        chipColor: baseRole?.chipColor || 'default',
+        doctor
+      };
+    })
+    .filter(Boolean);
+
+  const hasAssignedPersonnel = assignedDoctorEntries.length > 0;
 
   return (
     <Box>
@@ -97,82 +300,54 @@ export default function PersonnelTab({ operation, onUpdate, loading, costSummary
         Správa personálu operace
       </Typography>
 
-      {/* Primární lékař */}
+      {operation?.scheduled_start && operation?.scheduled_end && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+            Harmonogram anestezie
+          </Typography>
+          <Typography variant="body2">
+            Očekávaný začátek anestezie:{' '}
+            <strong>{formatTime(anesthesiaTimes.expectedStart)}</strong>
+          </Typography>
+          <Typography variant="body2">
+            Očekávaný konec anestezie:{' '}
+            <strong>{formatTime(anesthesiaTimes.expectedEnd)}</strong>
+          </Typography>
+        </Alert>
+      )}
+
       <Box sx={{ mb: 3 }}>
         <Typography variant="subtitle1" gutterBottom>
-          Primární lékař
+          Základní role
         </Typography>
-        <Autocomplete
-          options={doctors}
-          getOptionLabel={(option) => 
-            `Dr. ${option.first_name} ${option.last_name} - ${option.specialization} (${option.hourly_rate} Kč/hod)`
-          }
-          value={primaryDoctor}
-          onChange={(event, newValue) => setPrimaryDoctor(newValue)}
-          loading={loadingDoctors}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label="Vyberte primárního lékaře"
-              variant="outlined"
-              InputProps={{
-                ...params.InputProps,
-                endAdornment: (
-                  <>
-                    {loadingDoctors ? <CircularProgress color="inherit" size={20} /> : null}
-                    {params.InputProps.endAdornment}
-                  </>
-                ),
-              }}
-            />
-          )}
-        />
-        {primaryDoctor && operation.scheduled_start && operation.scheduled_end && (
-          <Alert severity="info" sx={{ mt: 1 }}>
-            Odhadované náklady: {calculatePersonnelCost(primaryDoctor, 'primary').toLocaleString('cs-CZ')} Kč
-            <br />
-            <Typography variant="caption">
-              (Délka operace: {getOperationDuration().toFixed(2)} hod × {primaryDoctor.hourly_rate} Kč/hod)
-            </Typography>
-          </Alert>
+        {BASE_ROLES.map((role) => renderRoleField(role))}
+      </Box>
+
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          Další role
+        </Typography>
+        {customRoles.length === 0 && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Přidejte vlastní role podle potřeby operace.
+          </Typography>
         )}
+        {customRoles.map((role) => renderRoleField(role, { removable: true }))}
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 2, flexWrap: 'wrap' }}>
+          <TextField
+            label="Název nové role"
+            value={newRoleLabel}
+            onChange={(event) => setNewRoleLabel(event.target.value)}
+            size="small"
+            sx={{ minWidth: 240 }}
+          />
+          <Button variant="outlined" onClick={handleAddCustomRole} disabled={!newRoleLabel.trim()}>
+            Přidat roli
+          </Button>
+        </Box>
       </Box>
 
-      {/* Asistující lékaři */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="subtitle1" gutterBottom>
-          Asistující lékaři
-        </Typography>
-        <Autocomplete
-          multiple
-          options={doctors}
-          getOptionLabel={(option) => 
-            `Dr. ${option.first_name} ${option.last_name} - ${option.specialization} (${option.hourly_rate} Kč/hod)`
-          }
-          value={assistingDoctors}
-          onChange={(event, newValue) => setAssistingDoctors(newValue)}
-          loading={loadingDoctors}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label="Vyberte asistující lékaře"
-              variant="outlined"
-            />
-          )}
-          renderTags={(value, getTagProps) =>
-            value.map((option, index) => (
-              <Chip
-                label={`Dr. ${option.first_name} ${option.last_name}`}
-                {...getTagProps({ index })}
-                key={option.id}
-              />
-            ))
-          }
-        />
-      </Box>
-
-      {/* Přehled personálu */}
-      {(primaryDoctor || assistingDoctors.length > 0) && operation.scheduled_start && operation.scheduled_end && (
+      {hasAssignedPersonnel && operation?.scheduled_start && operation?.scheduled_end && (
         <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle1" gutterBottom>
             Přehled personálu a nákladů
@@ -189,45 +364,18 @@ export default function PersonnelTab({ operation, onUpdate, loading, costSummary
                 </TableRow>
               </TableHead>
               <TableBody>
-                {primaryDoctor && (
-                  <TableRow>
-                    <TableCell>
-                      Dr. {primaryDoctor.first_name} {primaryDoctor.last_name}
-                    </TableCell>
-                    <TableCell>{primaryDoctor.specialization}</TableCell>
-                    <TableCell>
-                      <Chip 
-                        label="Primární"
-                        color="primary"
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell align="right">
-                      {parseFloat(primaryDoctor.hourly_rate).toLocaleString('cs-CZ')} Kč
-                    </TableCell>
-                    <TableCell align="right">
-                      <strong>{calculatePersonnelCost(primaryDoctor, 'primary').toLocaleString('cs-CZ')} Kč</strong>
-                    </TableCell>
-                  </TableRow>
-                )}
-                {assistingDoctors.map((doctor) => (
-                  <TableRow key={doctor.id}>
-                    <TableCell>
-                      Dr. {doctor.first_name} {doctor.last_name}
-                    </TableCell>
+                {assignedDoctorEntries.map(({ roleKey, roleLabel, chipColor, doctor }) => (
+                  <TableRow key={`${roleKey}-${doctor.id}`}>
+                    <TableCell>Dr. {doctor.first_name} {doctor.last_name}</TableCell>
                     <TableCell>{doctor.specialization}</TableCell>
                     <TableCell>
-                      <Chip 
-                        label="Asistent"
-                        color="default"
-                        size="small"
-                      />
+                      <Chip label={roleLabel} color={chipColor} size="small" />
                     </TableCell>
                     <TableCell align="right">
-                      {parseFloat(doctor.hourly_rate).toLocaleString('cs-CZ')} Kč
+                      {Number(doctor.hourly_rate || 0).toLocaleString('cs-CZ')} Kč
                     </TableCell>
                     <TableCell align="right">
-                      <strong>{calculatePersonnelCost(doctor, 'assisting').toLocaleString('cs-CZ')} Kč</strong>
+                      <strong>{calculatePersonnelCost(doctor).toLocaleString('cs-CZ')} Kč</strong>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -251,11 +399,7 @@ export default function PersonnelTab({ operation, onUpdate, loading, costSummary
       )}
 
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-        <Button
-          variant="contained"
-          onClick={handleSave}
-          disabled={loading}
-        >
+        <Button variant="contained" onClick={handleSave} disabled={loading}>
           {loading && <CircularProgress size={20} sx={{ mr: 1 }} />}
           {loading ? 'Ukládám...' : 'Uložit personál'}
         </Button>

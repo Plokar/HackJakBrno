@@ -12,6 +12,23 @@ import {
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/router';
 
+const ANESTHESIA_BUFFER_MINUTES = 15;
+
+const getAnesthesiaTimes = (startTime, endTime) => {
+  if (!startTime || !endTime) {
+    return { expectedStart: null, expectedEnd: null };
+  }
+
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  const bufferMs = ANESTHESIA_BUFFER_MINUTES * 60 * 1000;
+
+  return {
+    expectedStart: new Date(start.getTime() - bufferMs),
+    expectedEnd: new Date(end.getTime() + bufferMs)
+  };
+};
+
 export default function RoomDetailModal({ isOpen, onClose, roomId }) {
   const router = useRouter();
   const [roomDetail, setRoomDetail] = useState(null);
@@ -154,6 +171,9 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
   };
 
   const statusConfig = roomDetail ? getStatusConfig(roomDetail.status) : {};
+  const anesthesiaTimes = roomDetail?.currentOperation
+    ? getAnesthesiaTimes(roomDetail.currentOperation.startTime, roomDetail.currentOperation.estimatedEnd)
+    : { expectedStart: null, expectedEnd: null };
 
   return (
     <Transition.Root show={isOpen} as={Fragment}>
@@ -273,6 +293,18 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
                               subtitle={`Zbývá: ${formatTimeRemaining(roomDetail.currentOperation.estimatedEnd)}`}
                             />
                             <InfoCard
+                              icon={ClockIcon}
+                              label="Očekávaný začátek anestezie"
+                              value={formatTime(anesthesiaTimes.expectedStart)}
+                              subtitle="15 min před začátkem operace"
+                            />
+                            <InfoCard
+                              icon={ClockIcon}
+                              label="Očekávaný konec anestezie"
+                              value={formatTime(anesthesiaTimes.expectedEnd)}
+                              subtitle="15 min po skončení operace"
+                            />
+                            <InfoCard
                               icon={ChartBarIcon}
                               label="Priorita"
                               value={roomDetail.currentOperation.is_emergency ? 'URGENTNÍ' : 'Plánovaná'}
@@ -352,6 +384,131 @@ export default function RoomDetailModal({ isOpen, onClose, roomId }) {
                                       style: 'currency',
                                       currency: 'CZK'
                                     })}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Equipment Used */}
+                          {roomDetail.currentOperation.equipment && roomDetail.currentOperation.equipment.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-opacity-30" style={{ borderColor: '#E00034' }}>
+                              <h4 className="text-sm font-semibold text-gray-700 mb-2">Použité přístroje</h4>
+                              <div className="overflow-x-auto">
+                                <table className="min-w-full text-sm">
+                                  <thead>
+                                    <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
+                                      <th className="py-2 pr-4">Přístroj</th>
+                                      <th className="py-2 pr-4">Inventární kód</th>
+                                      <th className="py-2 pr-4">Hodinový odpis</th>
+                                      <th className="py-2 pr-4">Využité hodiny</th>
+                                      <th className="py-2 pr-4 text-right">Cena</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {roomDetail.currentOperation.equipment.map((equipment) => {
+                                      const equipmentCost = Number(equipment.cost || 0);
+                                      return (
+                                        <tr key={equipment.id} className="border-t border-gray-100">
+                                          <td className="py-2 pr-4 font-medium text-gray-900">{equipment.name}</td>
+                                          <td className="py-2 pr-4 text-gray-600">{equipment.equipment_code || 'N/A'}</td>
+                                          <td className="py-2 pr-4 text-gray-600">
+                                            {Number(equipment.hourly_rate || 0).toLocaleString('cs-CZ', {
+                                              style: 'currency',
+                                              currency: 'CZK'
+                                            })}{' '}
+                                            / hod
+                                          </td>
+                                          <td className="py-2 pr-4 text-gray-600">
+                                            {Number(equipment.hours_used || 0).toLocaleString('cs-CZ', {
+                                              minimumFractionDigits: 0,
+                                              maximumFractionDigits: 2
+                                            })}{' '}
+                                            hod
+                                          </td>
+                                          <td className="py-2 pr-0 text-right font-semibold text-gray-900">
+                                            {equipmentCost.toLocaleString('cs-CZ', { style: 'currency', currency: 'CZK' })}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                              {roomDetail.currentOperation.equipment_summary && (
+                                <div className="mt-3 text-xs text-gray-600 flex items-center justify-between">
+                                  <span>
+                                    Celkem přístrojů: {roomDetail.currentOperation.equipment_summary.equipment_count}
+                                  </span>
+                                  <span className="font-semibold text-gray-900">
+                                    Celkové náklady:{' '}
+                                    {Number(roomDetail.currentOperation.equipment_summary.total_equipment_cost || 0).toLocaleString(
+                                      'cs-CZ',
+                                      {
+                                        style: 'currency',
+                                        currency: 'CZK'
+                                      }
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Materials Used */}
+                          {roomDetail.currentOperation.materials && roomDetail.currentOperation.materials.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-opacity-30" style={{ borderColor: '#E00034' }}>
+                              <h4 className="text-sm font-semibold text-gray-700 mb-2">Použitý materiál</h4>
+                              <div className="overflow-x-auto">
+                                <table className="min-w-full text-sm">
+                                  <thead>
+                                    <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
+                                      <th className="py-2 pr-4">Materiál</th>
+                                      <th className="py-2 pr-4">EAN</th>
+                                      <th className="py-2 pr-4">Jednotka</th>
+                                      <th className="py-2 pr-4">Množství</th>
+                                      <th className="py-2 pr-4">Jednotková cena</th>
+                                      <th className="py-2 pr-4 text-right">Cena</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {roomDetail.currentOperation.materials.map((material) => {
+                                      const materialCost = Number(material.cost || 0);
+                                      return (
+                                        <tr key={material.id} className="border-t border-gray-100">
+                                          <td className="py-2 pr-4 font-medium text-gray-900">{material.name}</td>
+                                          <td className="py-2 pr-4 text-gray-600">{material.ean_code || 'N/A'}</td>
+                                          <td className="py-2 pr-4 text-gray-600">{material.unit || '-'}</td>
+                                          <td className="py-2 pr-4 text-gray-600">{material.quantity_used}×</td>
+                                          <td className="py-2 pr-4 text-gray-600">
+                                            {Number(material.unit_price || 0).toLocaleString('cs-CZ', {
+                                              style: 'currency',
+                                              currency: 'CZK'
+                                            })}
+                                          </td>
+                                          <td className="py-2 pr-0 text-right font-semibold text-gray-900">
+                                            {materialCost.toLocaleString('cs-CZ', { style: 'currency', currency: 'CZK' })}
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                              {roomDetail.currentOperation.material_summary && (
+                                <div className="mt-3 text-xs text-gray-600 flex items-center justify-between">
+                                  <span>
+                                    Celkem materiálu: {roomDetail.currentOperation.material_summary.material_count}
+                                  </span>
+                                  <span className="font-semibold text-gray-900">
+                                    Celkové náklady:{' '}
+                                    {Number(roomDetail.currentOperation.material_summary.total_material_cost || 0).toLocaleString(
+                                      'cs-CZ',
+                                      {
+                                        style: 'currency',
+                                        currency: 'CZK'
+                                      }
+                                    )}
                                   </span>
                                 </div>
                               )}

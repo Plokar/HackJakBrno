@@ -7,9 +7,14 @@ import {
   IdentificationIcon,
   HeartIcon,
   ClockIcon,
-  ClipboardDocumentListIcon
+  ClipboardDocumentListIcon,
+  SparklesIcon,
+  MagnifyingGlassCircleIcon,
+  ArrowPathIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import classNames from 'classnames';
+import { api } from '../../lib/api';
 
 export default function PatientDetailModal({ patient, onClose }) {
   const [activeTab, setActiveTab] = useState('overview');
@@ -23,6 +28,7 @@ export default function PatientDetailModal({ patient, onClose }) {
     { id: 'medical', label: 'Zdravotní informace', icon: HeartIcon },
     { id: 'operations', label: 'Historie operací', icon: ClipboardDocumentListIcon },
     { id: 'fhir', label: 'FHIR Data', icon: DocumentTextIcon },
+    { id: 'ai', label: 'AI přehled', icon: SparklesIcon },
   ];
 
   const calculateAge = (birthDate) => {
@@ -111,6 +117,7 @@ export default function PatientDetailModal({ patient, onClose }) {
         {activeTab === 'medical' && <MedicalTab patient={patient} />}
         {activeTab === 'operations' && <OperationsTab operations={operations} activeOperation={activeOperation} />}
         {activeTab === 'fhir' && <FHIRTab patient={patient} />}
+        {activeTab === 'ai' && <AIInsightsTab patient={patient} />}
       </div>
     </div>
   );
@@ -308,6 +315,140 @@ function FHIRTab({ patient }) {
           {JSON.stringify(fhirData, null, 2)}
         </pre>
       </div>
+    </div>
+  );
+}
+
+function AIInsightsTab({ patient }) {
+  const [question, setQuestion] = useState('Jaká byla poslední komplikace u tohoto pacienta?');
+  const [results, setResults] = useState([]);
+  const [metadata, setMetadata] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const runSearch = async (refresh = false) => {
+    if (!patient?.id) return;
+    setLoading(true);
+    setError('');
+    try {
+      const response = await api.patients.noteInsights(patient.id, {
+        question,
+        refresh,
+        top_k: 4,
+      });
+      setResults(response.results || []);
+      setMetadata({
+        available: response.available,
+        generatedAt: response.generated_at,
+        refreshed: response.refreshed,
+      });
+    } catch (err) {
+      setError(err.message || 'Nepodařilo se načíst AI přehled');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+        <label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+          <SparklesIcon className="h-5 w-5 text-red-500" />
+          Zadání dotazu
+        </label>
+        <textarea
+          className="w-full border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-red-300 focus:outline-none"
+          rows={3}
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="Např. Jaké jsou klíčové perioperační události?"
+        />
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => runSearch(false)}
+            disabled={loading || !question.trim()}
+            className={classNames(
+              'inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+              loading
+                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                : 'bg-red-600 text-white hover:bg-red-700'
+            )}
+          >
+            <MagnifyingGlassCircleIcon className="h-5 w-5 mr-2" />
+            {loading ? 'Probíhá vyhledávání…' : 'Vyhledat'}
+          </button>
+          <button
+            onClick={() => runSearch(true)}
+            disabled={loading}
+            className={classNames(
+              'inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium border transition-colors',
+              loading
+                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+            )}
+          >
+            <ArrowPathIcon className="h-5 w-5 mr-2" />
+            Synchronizovat z FHIR
+          </button>
+        </div>
+        {metadata && (
+          <div className="text-xs text-gray-500">
+            Dostupné poznámky: {metadata.available} • Aktualizováno: {metadata.generatedAt
+              ? new Date(metadata.generatedAt).toLocaleString('cs-CZ')
+              : '—'}
+            {metadata.refreshed && ' • Obnoveno z FHIR'}
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+          <ExclamationTriangleIcon className="h-5 w-5" />
+          {error}
+        </div>
+      )}
+
+      {results.length === 0 && !loading && !error && (
+        <div className="text-center py-10 border border-dashed border-gray-200 rounded-lg">
+          <SparklesIcon className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">
+            Zatím nejsou dostupné žádné klinické poznámky. Zkuste synchronizaci nebo změňte dotaz.
+          </p>
+        </div>
+      )}
+
+      {loading && (
+        <div className="text-center py-10 text-sm text-gray-500">Načítám klinické poznámky…</div>
+      )}
+
+      {results.length > 0 && !loading && (
+        <div className="space-y-4">
+          {results.map((result) => (
+            <div key={result.note_id} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm">
+              <div className="flex justify-between items-start gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {result.category || 'Klinická poznámka'}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {result.author || 'Neznámý autor'} •{' '}
+                    {result.indexed_at ? new Date(result.indexed_at).toLocaleString('cs-CZ') : 'Datum neznámé'}
+                  </p>
+                </div>
+                <span className="text-xs font-semibold text-red-600 bg-red-50 px-3 py-1 rounded-full">
+                  Relevance {(result.score * 100).toFixed(1)}%
+                </span>
+              </div>
+              <p className="text-sm text-gray-700 mt-3 whitespace-pre-wrap">
+                {result.excerpt} {result.excerpt?.length >= 600 && '…'}
+              </p>
+              {result.source_reference && (
+                <p className="text-xs text-gray-500 mt-2">Zdroj: {result.source_reference}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

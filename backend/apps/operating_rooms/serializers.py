@@ -3,7 +3,7 @@ from rest_framework import serializers
 from .models import (
     OperatingRoom, Patient, Doctor, Equipment, Material,
     Operation, PerioperativeProtocol, EquipmentUsage, MaterialUsage,
-    OperationTool
+    OperationTool, PatientClinicalNote
 )
 
 
@@ -347,3 +347,20 @@ class OperationToolSerializer(serializers.ModelSerializer):
     class Meta:
         model = OperationTool
         fields = '__all__'
+
+
+class PatientClinicalNoteSerializer(serializers.ModelSerializer):
+    """Serializer pro klinické poznámky pacienta."""
+
+    class Meta:
+        model = PatientClinicalNote
+        fields = [
+            'id',
+            'fhir_document_id',
+            'category',
+            'doc_status',
+            'author',
+            'indexed_at',
+            'note_text',
+            'source_reference',
+        ]
