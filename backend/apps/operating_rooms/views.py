@@ -11,7 +11,7 @@ import io
 from .models import (
     OperatingRoom, Patient, Doctor, Equipment, Material,
     Operation, PerioperativeProtocol, EquipmentUsage, MaterialUsage,
-    OperationTool
+    OperationTool, ToolUsage
 )
 from .serializers import (
     OperatingRoomSerializer, PatientSerializer, DoctorSerializer,
@@ -19,8 +19,16 @@ from .serializers import (
     OperationDetailSerializer, OperationCreateSerializer, PerioperativeProtocolSerializer,
     DashboardStatsSerializer, EquipmentUsageSerializer, MaterialUsageSerializer,
     OperationToolSerializer,
-    OperationApprovalSerializer, OperationStaffAssignmentSerializer
+    OperationApprovalSerializer, OperationStaffAssignmentSerializer,
+    PatientClinicalNoteSerializer
 )
+from services.clinical_notes_service import (
+    ClinicalNoteEmbeddingBuilder,
+    ClinicalNoteSearchService,
+    ClinicalNoteSyncService
+)
+from services.sync_service import sync_patient_notes_from_fhir
+from services.rag_service import ClinicalNoteRAGService
 
 
 class OperatingRoomViewSet(viewsets.ModelViewSet):
@@ -113,6 +121,87 @@ class OperatingRoomViewSet(viewsets.ModelViewSet):
                 'is_emergency': current_operation.is_emergency,
                 'notes': current_operation.notes or '',
             }
+
+            # Přidat informace o použitých nástrojích z perioperačního protokolu
+            try:
+                protocol = current_operation.protocol
+            except PerioperativeProtocol.DoesNotExist:
+                protocol = None
+
+            response_data['currentOperation']['tools'] = []
+            response_data['currentOperation']['tool_summary'] = {
+                'total_tools_cost': 0.0,
+                'tool_count': 0,
+            }
+            response_data['currentOperation']['equipment'] = []
+            response_data['currentOperation']['equipment_summary'] = {
+                'total_equipment_cost': 0.0,
+                'equipment_count': 0,
+            }
+            response_data['currentOperation']['materials'] = []
+            response_data['currentOperation']['material_summary'] = {
+                'total_material_cost': 0.0,
+                'material_count': 0,
+            }
+
+            if protocol:
+                tools_data = []
+                tool_usages = ToolUsage.objects.filter(protocol=protocol).select_related('tool')
+                for usage in tool_usages:
+                    tools_data.append({
+                        'id': usage.tool.id,
+                        'name': usage.tool.name,
+                        'category': usage.tool.category,
+                        'inventory_code': usage.tool.inventory_code,
+                        'status': usage.tool.status,
+                        'quantity_used': usage.quantity_used,
+                        'cost': float(usage.cost),
+                    })
+
+                response_data['currentOperation']['tools'] = tools_data
+                response_data['currentOperation']['tool_summary'] = {
+                    'total_tools_cost': float(protocol.total_tools_cost),
+                    'tool_count': len(tools_data),
+                }
+
+                equipment_data = []
+                equipment_usages = EquipmentUsage.objects.filter(protocol=protocol).select_related('equipment')
+                for usage in equipment_usages:
+                    equipment = usage.equipment
+                    equipment_data.append({
+                        'id': equipment.id,
+                        'name': equipment.name,
+                        'equipment_code': equipment.equipment_code,
+                        'hours_used': float(usage.hours_used),
+                        'hourly_rate': float(equipment.hourly_depreciation),
+                        'cost': float(usage.cost),
+                    })
+
+                response_data['currentOperation']['equipment'] = equipment_data
+                response_data['currentOperation']['equipment_summary'] = {
+                    'total_equipment_cost': float(protocol.total_equipment_cost),
+                    'equipment_count': len(equipment_data),
+                }
+
+                materials_data = []
+                material_usages = MaterialUsage.objects.filter(protocol=protocol).select_related('material')
+                for usage in material_usages:
+                    material = usage.material
+                    materials_data.append({
+                        'id': material.id,
+                        'name': material.name,
+                        'ean_code': material.ean_code,
+                        'unit': material.unit,
+                        'quantity_used': usage.quantity_used,
+                        'unit_price': float(material.unit_price),
+                        'cost': float(usage.cost),
+                    })
+
+                response_data['currentOperation']['materials'] = materials_data
+                response_data['currentOperation']['material_summary'] = {
+                    'total_material_cost': float(protocol.total_material_cost),
+                    'material_count': len(materials_data),
+                }
         
         # Přidat nadcházející operace
         if upcoming_operations.exists():
@@ -208,6 +297,46 @@ class PatientViewSet(viewsets.ModelViewSet):
         serializer = OperationListSerializer(operations, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'], url_path='sync-notes')
+    def sync_notes(self, request, pk=None):
+        """Spustí asynchronní synchronizaci klinických poznámek z FHIR."""
+        patient = self.get_object()
+        if not patient.fhir_id:
+            return Response({'error': 'Pacient nemá FHIR ID'}, status=status.HTTP_400_BAD_REQUEST)
+
+        task = sync_patient_notes_from_fhir.delay(patient.id)
+        return Response({'status': 'scheduled', 'task_id': task.id})
+
+    @action(detail=True, methods=['post'], url_path='note-insights')
+    def note_insights(self, request, pk=None):
+        """Vrátí kontextové výsledky z klinických poznámek pomocí semantického vyhledávání."""
+        patient = self.get_object()
+        question = (request.data.get('question') or '').strip()
+        top_k = int(request.data.get('top_k', 3))
+        refresh = str(request.data.get('refresh', '')).lower() in ['1', 'true', 'yes']
+
+        if not question:
+            return Response({'error': 'Dotaz nesmí být prázdný'}, status=status.HTTP_400_BAD_REQUEST)
+
+        rag_service = ClinicalNoteRAGService()
+        result = rag_service.generate_patient_summary(
+            patient=patient,
+            question=question,
+            refresh=refresh,
+            top_k=top_k
+        )
+
+        return Response({
+            'patient_id': patient.id,
+            'question': question,
+            'answer': result.get('answer'),
+            'sources': result.get('sources', []),
+            'available': result.get('available', 0),
+            'refreshed': result.get('refreshed', False),
+            'refresh_stats': result.get('refresh_stats'),
+            'generated_at': result.get('generated_at'),
+        })
+
 
 class DoctorViewSet(viewsets.ModelViewSet):
     queryset = Doctor.objects.all()
@@ -301,8 +430,17 @@ class OperationViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """Vytvoření nové operace - pouze pro doktory"""
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"CREATE OPERATION: User={request.user}, Type={type(request.user)}")
+        logger.info(f"Has profile: {hasattr(request.user, 'profile')}")
+        if hasattr(request.user, 'profile'):
+            logger.info(f"Profile role: {request.user.profile.role}")
+        
         # Kontrola, že uživatel je doktor
         if not hasattr(request.user, 'profile') or request.user.profile.role != 'doctor':
+            logger.warning(f"403 - User denied: has_profile={hasattr(request.user, 'profile')}, role={request.user.profile.role if hasattr(request.user, 'profile') else 'NO PROFILE'}")
             return Response(
                 {'error': 'Pouze doktoři mohou vytvářet operace'},
                 status=status.HTTP_403_FORBIDDEN
@@ -780,6 +918,197 @@ class DashboardViewSet(viewsets.ViewSet):
             'room_utilization': room_utilization,
             'upcoming_operations': OperationListSerializer(upcoming_operations, many=True).data
         }
+        
+        return Response(data)
+    
+    @action(detail=False, methods=['get'], url_path='analytics/room-utilization')
+    def room_utilization_analytics(self, request):
+        """Analytika vytížení sálů v čase"""
+        days = int(request.query_params.get('days', 30))
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=days)
+        
+        rooms = OperatingRoom.objects.filter(is_active=True)
+        data = []
+        
+        for room in rooms:
+            operations = Operation.objects.filter(
+                operating_room=room,
+                scheduled_start__date__gte=start_date,
+                scheduled_start__date__lte=end_date
+            )
+            
+            total_operations = operations.count()
+            completed = operations.filter(status='completed').count()
+            total_hours = sum(op.duration_hours for op in operations if op.duration_hours)
+            avg_duration = total_hours / total_operations if total_operations > 0 else 0
+            
+            data.append({
+                'room_name': room.name,
+                'room_number': room.room_number,
+                'total_operations': total_operations,
+                'completed_operations': completed,
+                'total_hours': round(total_hours, 2),
+                'avg_duration_hours': round(avg_duration, 2),
+                'utilization_percent': round((total_hours / (days * 24)) * 100, 2) if days > 0 else 0
+            })
+        
+        return Response(data)
+    
+    @action(detail=False, methods=['get'], url_path='analytics/operation-types')
+    def operation_types_analytics(self, request):
+        """Analytika typů operací"""
+        days = int(request.query_params.get('days', 30))
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=days)
+        
+        operations = Operation.objects.filter(
+            scheduled_start__date__gte=start_date,
+            scheduled_start__date__lte=end_date
+        )
+        
+        type_stats = {}
+        for operation in operations:
+            op_type = operation.operation_type or 'Neznámý typ'
+            if op_type not in type_stats:
+                type_stats[op_type] = {
+                    'type': op_type,
+                    'count': 0,
+                    'total_hours': 0.0,
+                }
+            type_stats[op_type]['count'] += 1
+            type_stats[op_type]['total_hours'] += float(operation.duration_hours or 0)
+        
+        data = sorted(
+            (
+                {
+                    'type': stats['type'],
+                    'count': stats['count'],
+                    'total_hours': round(stats['total_hours'], 2),
+                }
+                for stats in type_stats.values()
+            ),
+            key=lambda item: item['count'],
+            reverse=True
+        )
+        
+        return Response(data)
+    
+    @action(detail=False, methods=['get'], url_path='analytics/operations-by-status')
+    def operations_by_status(self, request):
+        """Analytika operací podle statusu"""
+        days = int(request.query_params.get('days', 30))
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=days)
+        
+        operations = Operation.objects.filter(
+            scheduled_start__date__gte=start_date,
+            scheduled_start__date__lte=end_date
+        )
+        
+        status_counts = operations.values('status').annotate(count=Count('id'))
+        
+        status_labels = {
+            'draft': 'Návrh',
+            'pending_approval': 'Čeká na schválení',
+            'approved': 'Schváleno',
+            'scheduled': 'Naplánováno',
+            'in_progress': 'Probíhá',
+            'completed': 'Dokončeno',
+            'cancelled': 'Zrušeno'
+        }
+        
+        data = [
+            {
+                'status': item['status'],
+                'label': status_labels.get(item['status'], item['status']),
+                'count': item['count']
+            }
+            for item in status_counts
+        ]
+        
+        return Response(data)
+    
+    @action(detail=False, methods=['get'], url_path='analytics/operations-timeline')
+    def operations_timeline(self, request):
+        """Časová osa operací - denní/denní agregace"""
+        days = int(request.query_params.get('days', 30))
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=days)
+        
+        operations = Operation.objects.filter(
+            scheduled_start__date__gte=start_date,
+            scheduled_start__date__lte=end_date
+        )
+        
+        # Agregace po dnech
+        daily_data = {}
+        current_date = start_date
+        while current_date <= end_date:
+            daily_data[current_date.isoformat()] = {
+                'date': current_date.isoformat(),
+                'total': 0,
+                'completed': 0,
+                'cancelled': 0
+            }
+            current_date += timedelta(days=1)
+        
+        for op in operations:
+            date_key = op.scheduled_start.date().isoformat() if op.scheduled_start else None
+            if date_key and date_key in daily_data:
+                daily_data[date_key]['total'] += 1
+                if op.status == 'completed':
+                    daily_data[date_key]['completed'] += 1
+                elif op.status == 'cancelled':
+                    daily_data[date_key]['cancelled'] += 1
+        
+        data = list(daily_data.values())
+        return Response(data)
+    
+    @action(detail=False, methods=['get'], url_path='analytics/doctors-performance')
+    def doctors_performance(self, request):
+        """Výkonnost doktorů"""
+        days = int(request.query_params.get('days', 30))
+        end_date = timezone.now().date()
+        start_date = end_date - timedelta(days=days)
+        
+        operations = Operation.objects.filter(
+            scheduled_start__date__gte=start_date,
+            scheduled_start__date__lte=end_date,
+            primary_doctor__isnull=False
+        ).select_related('primary_doctor')
+        
+        doctor_stats = {}
+        for operation in operations:
+            doctor = operation.primary_doctor
+            if not doctor:
+                continue
+            
+            if doctor.id not in doctor_stats:
+                doctor_stats[doctor.id] = {
+                    'doctor_id': doctor.id,
+                    'doctor_name': f"Dr. {doctor.first_name} {doctor.last_name}",
+                    'total_operations': 0,
+                    'completed_operations': 0,
+                    'total_hours': 0.0,
+                }
+            
+            stats = doctor_stats[doctor.id]
+            stats['total_operations'] += 1
+            if operation.status == 'completed':
+                stats['completed_operations'] += 1
+            stats['total_hours'] += float(operation.duration_hours or 0)
+        
+        data = []
+        for stats in doctor_stats.values():
+            avg_duration = stats['total_hours'] / stats['total_operations'] if stats['total_operations'] > 0 else 0
+            data.append({
+                **stats,
+                'total_hours': round(stats['total_hours'], 2),
+                'avg_duration': round(avg_duration, 2),
+            })
+        
+        data.sort(key=lambda item: item['total_operations'], reverse=True)
         
         return Response(data)
 

@@ -11,6 +11,10 @@ from services.fhir_mappers import (
     fhir_practitioner_to_django,
     fhir_location_to_django
 )
+from services.clinical_notes_service import (
+    ClinicalNoteEmbeddingBuilder,
+    ClinicalNoteSyncService
+)
 from apps.operating_rooms.models import Patient, Doctor, OperatingRoom, Operation
 
 logger = logging.getLogger(__name__)
@@ -105,6 +109,9 @@ def sync_from_fhir_periodic():
                 patient.fhir_last_synced = timezone.now()
                 patient.save()
                 results['patients'] += 1
+
+                if patient.fhir_id:
+                    sync_patient_notes_from_fhir.delay(patient.id)
             except Exception as e:
                 logger.error(f"Error syncing patient: {str(e)}")
                 results['errors'].append(str(e))
@@ -185,4 +192,35 @@ def sync_operation_to_fhir(operation_id):
     except Exception as e:
         logger.error(f"Chyba při synchronizaci operace {operation_id}: {str(e)}")
         return {'success': False, 'error': str(e)}
+
+
+@shared_task
+def sync_patient_notes_from_fhir(patient_id: int):
+    """Stáhne DocumentReference pro konkrétního pacienta."""
+    try:
+        patient = Patient.objects.get(id=patient_id)
+    except Patient.DoesNotExist:
+        logger.error("sync_patient_notes_from_fhir: Patient %s neexistuje", patient_id)
+        return {'error': 'patient_not_found'}
+
+    service = ClinicalNoteSyncService()
+    stats = service.sync_patient(patient)
+
+    if stats.get('pending_embedding', 0) > 0:
+        build_note_embeddings_for_patient.delay(patient_id)
+
+    return stats
+
+
+@shared_task
+def build_note_embeddings_for_patient(patient_id: int):
+    """Spočítá embeddingy pro všechny poznámky pacienta čekající na zpracování."""
+    try:
+        patient = Patient.objects.get(id=patient_id)
+    except Patient.DoesNotExist:
+        logger.error("build_note_embeddings_for_patient: Patient %s neexistuje", patient_id)
+        return {'error': 'patient_not_found'}
+
+    builder = ClinicalNoteEmbeddingBuilder()
+    return builder.build_for_patient(patient)
 

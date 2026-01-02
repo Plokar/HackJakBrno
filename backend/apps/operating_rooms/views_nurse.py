@@ -2,7 +2,7 @@
 API endpointy pro práci sestřičky s operacemi
 Správa personálu, nástrojů, materiálů a výpočet nákladů
 """
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, mixins
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import transaction
@@ -21,8 +21,13 @@ from .serializers_staff import (
 )
 
 
-class OperationNurseViewSet(viewsets.ViewSet):
+class OperationNurseViewSet(mixins.RetrieveModelMixin,
+                            mixins.ListModelMixin,
+                            viewsets.GenericViewSet):
     """ViewSet pro práci sestřičky s operacemi"""
+    
+    queryset = Operation.objects.all()
+    serializer_class = OperationStaffDetailSerializer
     
     @action(detail=True, methods=['post'], url_path='add-personnel')
     def add_personnel(self, request, pk=None):
@@ -386,15 +391,11 @@ class OperationNurseViewSet(viewsets.ViewSet):
     
     def _get_materials_details(self, protocol):
         """Získat detaily použitých materiálů"""
-        usages = MaterialUsage.objects.filter(protocol=protocol)
-        serializer = MaterialUsageDetailSerializer(usages, many=True)
-        return serializer.data
+        return list(MaterialUsage.objects.filter(protocol=protocol))
     
     def _get_equipment_details(self, protocol):
         """Získat detaily použitých přístrojů"""
-        usages = EquipmentUsage.objects.filter(protocol=protocol)
-        serializer = EquipmentUsageDetailSerializer(usages, many=True)
-        return serializer.data
+        return list(EquipmentUsage.objects.filter(protocol=protocol))
     
     @action(detail=True, methods=['delete'], url_path='remove-tool/(?P<tool_usage_id>[^/.]+)')
     def remove_tool(self, request, pk=None, tool_usage_id=None):

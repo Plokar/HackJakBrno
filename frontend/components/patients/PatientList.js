@@ -152,7 +152,7 @@ export default function PatientList({ patients = [], onPatientClick }) {
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <UserCircleIcon className="h-10 w-10 text-gray-400 mr-3" />
+                        <UserCircleIcon className="h-10 w-10 text-blue-500 mr-3" />
                         <div>
                           <div className="text-sm font-medium text-gray-900">
                             {patient.name}
@@ -218,7 +218,7 @@ export default function PatientList({ patients = [], onPatientClick }) {
           </table>
         ) : (
           <div className="text-center py-12">
-            <UserCircleIcon className="h-16 w-16 text-gray-300 mx-auto mb-3" />
+            <UserCircleIcon className="h-16 w-16 text-blue-300 mx-auto mb-3" />
             <p className="text-gray-500">Žádní pacienti nenalezeni</p>
             <p className="text-sm text-gray-400 mt-1">
               {searchTerm ? 'Zkuste změnit vyhledávací kritéria' : 'Začněte přidáním prvního pacienta'}

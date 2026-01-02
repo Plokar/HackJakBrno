@@ -82,7 +82,25 @@ class MockAuthMiddleware:
     
     def __call__(self, request):
         # Vytvořit mock uživatele přímo v paměti (ne v databázi)
-        role = request.headers.get('X-User-Role', 'doctor')
+        # Zkusit několik způsobů, jak získat roli z headeru
+        role = None
+        
+        # 1. Moderní Django přístup (3.2+)
+        if hasattr(request, 'headers'):
+            role = request.headers.get('X-User-Role')
+        
+        # 2. Klasický Django přístup přes META (kompatibilita s reverse proxy)
+        if not role:
+            role = request.META.get('HTTP_X_USER_ROLE')
+        
+        # 3. Fallback na default
+        if not role:
+            role = 'doctor'
+        
+        # Debug logging pro produkci
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"MockAuthMiddleware: Role nastavena na '{role}' pro request {request.path}")
         
         # Vytvořit mock objekt uživatele
         class MockUser:

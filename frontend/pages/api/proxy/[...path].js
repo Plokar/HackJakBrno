@@ -4,7 +4,7 @@
  */
 
 export default async function handler(req, res) {
-  const { path } = req.query;
+  const { path, ...queryParams } = req.query;
   
   // Sestavit backend URL - v Dockeru používáme název služby 'backend'
   const isDocker = process.env.DOCKER_ENV === 'true';
@@ -12,7 +12,13 @@ export default async function handler(req, res) {
   
   // Zachovat trailing slash, pokud je v původní URL
   const pathString = path.join('/');
-  const backendUrl = `${backendHost}/api/${pathString}/`;
+  let backendUrl = `${backendHost}/api/${pathString}/`;
+  
+  // Přidat query parametry, pokud existují
+  const queryString = new URLSearchParams(queryParams).toString();
+  if (queryString) {
+    backendUrl += `?${queryString}`;
+  }
 
   console.log(`[Proxy] ${req.method} ${backendUrl}`);
 

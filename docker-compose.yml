@@ -28,7 +28,23 @@ services:
     build: 
       context: ./backend
       dockerfile: Dockerfile
-    command: bash -c "./entrypoint.sh"
+    command: >
+      bash -c "
+      echo 'Starting Django application...' &&
+      echo 'Waiting for PostgreSQL...' &&
+      while ! nc -z db 5432; do sleep 0.1; done &&
+      echo 'PostgreSQL started' &&
+      echo 'Running database migrations...' &&
+      python manage.py migrate --noinput &&
+      echo 'Collecting static files...' &&
+      python manage.py collectstatic --noinput &&
+      echo 'Initializing operating rooms...' &&
+      python manage.py init_operating_rooms --count 10 || echo 'Warning: Could not initialize operating rooms' &&
+      echo 'Initializing doctors...' &&
+      python manage.py init_doctors || echo 'Warning: Could not initialize doctors' &&
+      echo 'Starting production server with Gunicorn...' &&
+      gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 2 --timeout 60 --access-logfile - --error-logfile - --log-level info
+      "
     container_name: medichub_backend
     env_file:
       - .env
@@ -40,20 +56,27 @@ services:
       - app-network
       - korex_space_korex_network  # Připojení do KOREX nginx sítě
     depends_on:
-      - db
-      - redis
-      - fhir-server
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+      fhir-server:
+        condition: service_started
     restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: medichub_frontend
     env_file:
       - .env
     environment:
       - NODE_ENV=production
+      - DOCKER_ENV=true
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     networks:
       - app-network
       - korex_space_korex_network  # Připojení do KOREX nginx sítě
@@ -62,7 +85,9 @@ services:
     restart: unless-stopped
 
   fhir-server:
-    image: intersystemsdc/irishealth-community:latest
+    build:
+      context: ./iris-fhir-template-master
+      dockerfile: Dockerfile
     container_name: medichub_fhir
     restart: unless-stopped
     ports:
@@ -70,18 +95,23 @@ services:
       - "32783:52773"
       - "32784:53773"
     volumes:
-      - fhir_data:/usr/irissys/mgr
-      - ./iris-fhir-template-master/data/fhir:/data/fhir
-      - ./iris-fhir-template-master/src:/irisdev/app/src
-      - ./iris-fhir-template-master/iris.script:/irisdev/app/iris.script
-      - ./iris-fhir-template-master/module.xml:/irisdev/app/module.xml
+      - ./iris-fhir-template-master/data:/data
+      - ./iris-fhir-template-master/fhirUI:/usr/irissys/csp/fhirUI
     environment:
       - IRIS_PASSWORD=SYS
       - IRIS_USERNAME=SuperUser
     networks:
       - app-network
       - korex_space_korex_network
-    command: 
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:52773/fhir/r4/metadata || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    command:
+      - -a
+      - iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords("*")'
       - --check-caps false
 
 volumes:

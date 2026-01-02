@@ -7,7 +7,8 @@ DEBUG = False
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'yourdomain.com,www.yourdomain.com').split(',')
 
 # Security settings pro HTTPS
-SECURE_SSL_REDIRECT = True
+# SSL redirect je False, protože nginx již terminuje HTTPS
+SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
@@ -26,24 +27,26 @@ SECURE_HSTS_PRELOAD = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Session security
-SESSION_COOKIE_SAMESITE = 'Strict'  # Přísnější v produkci
+SESSION_COOKIE_SAMESITE = 'Lax'  # Lax místo Strict pro cross-origin API
 SESSION_COOKIE_AGE = 86400  # 24 hodin v produkci
+SESSION_COOKIE_DOMAIN = '.korex.space'  # Sdílení mezi subdoménami
 
 # CSRF security
-CSRF_COOKIE_SAMESITE = 'Strict'
+CSRF_COOKIE_SAMESITE = 'Lax'  # Lax místo Strict pro cross-origin API
 CSRF_USE_SESSIONS = False  # False pro REST API s separate frontend
+CSRF_COOKIE_DOMAIN = '.korex.space'  # Sdílení mezi subdoménami
 
 # CORS pro produkci - nastavte své domény
 CORS_ALLOWED_ORIGINS = os.environ.get(
     'CORS_ALLOWED_ORIGINS',
-    'https://yourdomain.com,https://www.yourdomain.com'
+    'https://medichub.korex.space'
 ).split(',')
 CORS_ALLOW_CREDENTIALS = True
 
 # CSRF Trusted Origins pro produkci
 CSRF_TRUSTED_ORIGINS = os.environ.get(
     'CSRF_TRUSTED_ORIGINS',
-    'https://yourdomain.com,https://www.yourdomain.com'
+    'https://medichub.korex.space'
 ).split(',')
 
 # Password requirements (přísnější v produkci)
@@ -74,11 +77,26 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'core.middleware.MockAuthMiddleware',  # Mock auth pro DEMO
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'core.middleware.RateLimitMiddleware',  # Rate limiting
     'core.middleware.SecurityHeadersMiddleware',
 ]
+
+# Odebrat CSRF middleware pro demo (stejně jako v dev)
+MIDDLEWARE = [m for m in MIDDLEWARE if 'CsrfViewMiddleware' not in m]
+
+# Pro DEMO - vypnout CSRF ochranu úplně a použít MockAuthentication (stejně jako v dev)
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'core.authentication.MockAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+}
 
 # Cache pro rate limiting (použijte Redis v produkci)
 CACHES = {
@@ -138,3 +156,9 @@ EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+
+# CSRF exemption pro DEMO - povolit API bez CSRF tokenu
+CSRF_COOKIE_HTTPONLY = False
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = True

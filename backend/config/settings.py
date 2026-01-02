@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.postgres',
     
     # Third-party apps
     'rest_framework',
@@ -214,3 +215,9 @@ LOGGING = {
         },
     },
 }
+
+# RAG / embedding nastavení
+NOTE_EMBEDDING_MODEL = os.environ.get('NOTE_EMBEDDING_MODEL', 'all-MiniLM-L6-v2')
+NOTE_EMBEDDING_BATCH_SIZE = int(os.environ.get('NOTE_EMBEDDING_BATCH_SIZE', '16'))
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+GROQ_MODEL_NAME = os.environ.get('GROQ_MODEL_NAME', 'meta-llama/llama-4-scout-17b-16e-instruct')

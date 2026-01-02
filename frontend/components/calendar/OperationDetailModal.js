@@ -41,7 +41,7 @@ export default function OperationDetailModal({ isOpen, onClose, operationId, onO
 
   const fetchCostSummary = async (opId) => {
     try {
-      const response = await fetch(`/api/proxy/medic/nurse/operations/${opId}/cost-summary`);
+      const response = await fetch(`/proxy/medic/nurse/operations/${opId}/cost-summary`);
       if (response.ok) {
         const data = await response.json();
         setCostSummary(data);
