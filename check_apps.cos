@@ -1,6 +1,0 @@
-zn "%SYS"
-write "Checking CSP Applications:",!
-write "========================",!
-write "/fhirUI exists: ",##class(Security.Applications).Exists("/fhirUI"),!
-write "/fhir/r4 exists: ",##class(Security.Applications).Exists("/fhir/r4"),!
-write "/csp/healthshare/fhirserver/fhir/r4 exists: ",##class(Security.Applications).Exists("/csp/healthshare/fhirserver/fhir/r4"),!
